@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-08-07",
+  "capturedAt": "2026-09-15",
   "doctors": [
     {
       "id": "34658552-a95d-42e0-a907-e1d2c583e534",
@@ -70,16 +70,6 @@
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=41861&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/nishanth.jpg",
       "display_order": 7
-    },
-    {
-      "id": "6203b308-02bc-40a6-93d3-56742bdfadae",
-      "name": "Dr. K. Aparna",
-      "qualification": "MD Psychiatry",
-      "department": "Psychiatry",
-      "bio": "Dr. K Aparna is an experienced Neuropsychiatrist and certified life coach, offering specialized services in mental health and wellness.\n\nAreas of Expertise:\n• Addiction psychiatry\n• Psychosis & bipolar disorder\n• Depression, anxiety & OCD\n• Personality disorders\n• Adolescent psychiatry\n• Senile dementia care\n\nQualifications:\n• MD in Psychiatry\n\nLanguages: English & Telugu",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48191&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/dr%20aparna.jpeg",
-      "display_order": 8
     },
     {
       "id": "1578ffc1-399a-4b04-8f8a-1a29f6b4f6f1",
