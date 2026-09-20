@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-09-15",
+  "capturedAt": "2026-09-19",
   "doctors": [
     {
       "id": "34658552-a95d-42e0-a907-e1d2c583e534",
@@ -22,46 +22,6 @@
       "display_order": 2
     },
     {
-      "id": "c7aeb95d-0d13-44a4-9588-c29e42213b2b",
-      "name": "Ms. Muskan Gupta",
-      "qualification": "MPhil Clinical Psychology",
-      "department": "Psychology",
-      "bio": "Muskan is an RCI-certified clinical psychologist providing individual and couple counselling for both children and adults.\n\nAreas of Expertise:\n• Depression, anxiety & panic disorders\n• Eating disorders & PTSD\n• ADHD & adjustment disorders\n• Substance use & personality disorders\n• Psychometric testing\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Acceptance & Commitment Therapy (ACT)\n• Schema-focused therapy\n• Dialectical Behaviour Therapy (DBT)\n• Exposure & Response Prevention (ERP)\n• Mindfulness therapy\n\nQualifications:\n• M.Phil. in Clinical Psychology — Manipal Academy of Higher Education",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48125&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/muskan.jpg",
-      "display_order": 3
-    },
-    {
-      "id": "3b9a894c-0450-4a03-b6ad-47ffdb911ab6",
-      "name": "Ms. Akansha Kabra",
-      "qualification": "MA Psychology",
-      "department": "Psychology",
-      "bio": "Akansha is a Masters in Psychology with an eclectic therapeutic approach, using a variety of therapies tailored to each client's unique needs and overall well-being.\n\nAreas of Expertise:\n• Anxiety & anger management\n• Stress management & depression\n• Adjustment & self-esteem issues\n• Socio-emotional concerns\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Relaxation-based techniques\n• Imago Relationship Therapy\n• Play Therapy\n\nLanguages: Hindi & English",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48126&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Akansha-Kabra.jpg",
-      "display_order": 4
-    },
-    {
-      "id": "f18a4b51-8ee0-4f1f-8c98-e2e4ef6bc9ca",
-      "name": "Ms. Sneha Sesha",
-      "qualification": "MPhil in Social Work",
-      "department": "Social Work",
-      "bio": "Sneha is a highly skilled psychiatric social worker specializing in addiction recovery and mental health interventions.\n\nAreas of Expertise:\n• Deaddiction & substance dependencies\n• Social skills training & cognitive retraining\n• Family counselling & psychoeducation\n• Mental health rehabilitation\n\nTherapeutic Approaches:\n• Cognitive Behavioural Therapy (CBT)\n• Motivational Enhancement Therapy (MET)\n• Family therapy & psychoeducation\n• Personalized recovery planning\n\nQualifications:\n• MPhil in Psychiatric Social Work — Manipal Academy of Higher Education\n\nLanguages: English, Telugu & Hindi",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=45153&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/sneha.jpg",
-      "display_order": 5
-    },
-    {
-      "id": "c9f68f87-f08b-4836-8800-d3e8c908969c",
-      "name": "Ms. Arani Shankar",
-      "qualification": "PGDP in Clinical Psychology",
-      "department": "Psychology",
-      "bio": "Arani is an RCI-certified clinical psychologist with over 6 years of experience in evidence-based psychotherapies.\n\nAreas of Expertise:\n• Depression & OCD spectrum disorders\n• Anxiety & ADHD\n• Substance use & personality disorders\n• Couple & marital issues\n• Psychological assessments\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Rational Emotive Behaviour Therapy (REBT)\n• Acceptance & Commitment Therapy (ACT)\n• Exposure & Response Prevention (ERP)\n• Mindfulness-based therapies & NLP\n\nQualifications:\n• Professional Diploma in Clinical Psychology\n• MSc Psychology — Acharya Nagarjuna University\n\nLanguages: English, Telugu & Hindi",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48146&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Arani-Shankar.png",
-      "display_order": 6
-    },
-    {
       "id": "bab37904-f471-44cd-9193-763fd4a5f833",
       "name": "Dr. Nishanth Vemana",
       "qualification": "MD Psychiatry",
@@ -69,7 +29,17 @@
       "bio": "Dr. Nishanth is an M.D. in Psychiatry with over 14 years of experience. His work in rehabilitation and clinical settings has reinforced his belief that \"there is no health without mental health.\"\n\nAreas of Expertise:\n• Substance addiction & rehabilitation\n• Chronic mental illness — schizophrenia, bipolar disorder\n• Depression, anxiety & OCD\n\nLanguages: Hindi, English, Telugu & Kannada",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=41861&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/nishanth.jpg",
-      "display_order": 7
+      "display_order": 3
+    },
+    {
+      "id": "c7aeb95d-0d13-44a4-9588-c29e42213b2b",
+      "name": "Ms. Muskan Gupta",
+      "qualification": "MPhil Clinical Psychology",
+      "department": "Psychology",
+      "bio": "Muskan is an RCI-certified clinical psychologist providing individual and couple counselling for both children and adults.\n\nAreas of Expertise:\n• Depression, anxiety & panic disorders\n• Eating disorders & PTSD\n• ADHD & adjustment disorders\n• Substance use & personality disorders\n• Psychometric testing\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Acceptance & Commitment Therapy (ACT)\n• Schema-focused therapy\n• Dialectical Behaviour Therapy (DBT)\n• Exposure & Response Prevention (ERP)\n• Mindfulness therapy\n\nQualifications:\n• M.Phil. in Clinical Psychology — Manipal Academy of Higher Education",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48125&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/muskan.jpg",
+      "display_order": 4
     },
     {
       "id": "1578ffc1-399a-4b04-8f8a-1a29f6b4f6f1",
@@ -79,27 +49,7 @@
       "bio": "Dr. Tina Fernandes has worked in Research, Education, and Mental Health for over 35 years. She is committed to empowering individuals to break cycles, heal, and reclaim their agency.\n\nAreas of Expertise:\n• Managing personal relationships\n• Life transitions & adjustment\n• Anxiety, depression & trauma\n• Disruptive behaviours & self-esteem\n• Adolescent & adult psychological issues\n\nTherapeutic Approaches:\n• Narrative therapy\n• Mindfulness-based therapy\n• Cognitive Behaviour Therapy (CBT)\n• Person-centred therapy\n• Psychoanalytic psychotherapy\n\nQualifications:\n• MA, BEd, MPhil, PhD in Psychology\n\nLanguages: English & Hindi",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48148&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/tina.jpg",
-      "display_order": 9
-    },
-    {
-      "id": "c9eb28c5-6b55-48c7-a58b-69f264c4c6f5",
-      "name": "Ms. Purvi Maski",
-      "qualification": "MPhil Clinical Psychology",
-      "department": "Psychology",
-      "bio": "Purvi is an RCI-certified clinical psychologist and certified marital & family therapist, specializing in heterosexual and LGBTQ+ couples and families.\n\nAreas of Expertise:\n• Anxiety, depression & grief\n• Addiction & emotional disturbances\n• Life transitions & anger management\n• Stress, pre- & post-operative counselling\n• Pain management & adolescent issues\n• LGBTQ+ couple & family therapy\n\nTherapeutic Approaches:\n• Emotionally Focused Therapy (EFT)\n• Solution-driven, evidence-based integrative approach\n\nQualifications:\n• MPhil in Clinical Psychology\n• MSc Health Psychology — Central University, Hyderabad\n\nLanguages: Hindi, English & Gujarati",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=42507&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/purvi.jpg",
-      "display_order": 10
-    },
-    {
-      "id": "fd224f7a-fb44-4978-8eac-ed9372049a51",
-      "name": "Ms. Apeksha",
-      "qualification": "PGDP in Clinical Psychology",
-      "department": "Psychology",
-      "bio": "Apeksha is a licensed psychologist committed to providing personalized, compassionate care that meets each client where they are. Her approach is flexible and responsive, drawing from evidence-based methods.\n\nAreas of Expertise:\n• Stress & depression\n• Anxiety disorders\n• Adjustment disorders\n\nQualifications:\n• Professional Diploma in Clinical Psychology — Sweekaar Academy of Rehabilitation Sciences, Hyderabad\n\nLanguages: English & Hindi",
-      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48264&eid=48109",
-      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/apeksha.png",
-      "display_order": 11
+      "display_order": 5
     },
     {
       "id": "a5901a1e-31b0-481d-b315-3f0078ef6d0d",
@@ -109,7 +59,57 @@
       "bio": "Shruti is a Masters in Clinical Psychology from Jain University, Bangalore. As a Gen Z therapist, students find her particularly relatable.\n\nAreas of Expertise:\n• Anxiety, depression & stress management\n• Gender identity & sexuality\n• Body image & self-esteem challenges\n• Substance use & exam stress\n• Career confusion & academic performance anxiety\n• Social anxiety & boundary setting\n\nTherapeutic Approaches:\n• CBT, DBT & Acceptance and Commitment Therapy (ACT)\n• Queer Affirmative Therapy\n• Family Therapy & Systematic Desensitisation\n\nQualifications:\n• MSc Clinical Psychology — Jain University, Bangalore\n• Diploma in Organizational Psychology\n\nLanguages: Hindi, English, Urdu, Dogri & Punjabi",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48827&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Shruti%20Sharma.png",
-      "display_order": 12
+      "display_order": 6
+    },
+    {
+      "id": "3b9a894c-0450-4a03-b6ad-47ffdb911ab6",
+      "name": "Ms. Akansha Kabra",
+      "qualification": "MA Psychology",
+      "department": "Psychology",
+      "bio": "Akansha is a Masters in Psychology with an eclectic therapeutic approach, using a variety of therapies tailored to each client's unique needs and overall well-being.\n\nAreas of Expertise:\n• Anxiety & anger management\n• Stress management & depression\n• Adjustment & self-esteem issues\n• Socio-emotional concerns\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Relaxation-based techniques\n• Imago Relationship Therapy\n• Play Therapy\n\nLanguages: Hindi & English",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48126&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Akansha-Kabra.jpg",
+      "display_order": 7
+    },
+    {
+      "id": "c9f68f87-f08b-4836-8800-d3e8c908969c",
+      "name": "Ms. Arani Shankar",
+      "qualification": "PGDP in Clinical Psychology",
+      "department": "Psychology",
+      "bio": "Arani is an RCI-certified clinical psychologist with over 6 years of experience in evidence-based psychotherapies.\n\nAreas of Expertise:\n• Depression & OCD spectrum disorders\n• Anxiety & ADHD\n• Substance use & personality disorders\n• Couple & marital issues\n• Psychological assessments\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Rational Emotive Behaviour Therapy (REBT)\n• Acceptance & Commitment Therapy (ACT)\n• Exposure & Response Prevention (ERP)\n• Mindfulness-based therapies & NLP\n\nQualifications:\n• Professional Diploma in Clinical Psychology\n• MSc Psychology — Acharya Nagarjuna University\n\nLanguages: English, Telugu & Hindi",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48146&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Arani-Shankar.png",
+      "display_order": 8
+    },
+    {
+      "id": "f18a4b51-8ee0-4f1f-8c98-e2e4ef6bc9ca",
+      "name": "Ms. Sneha Sesha",
+      "qualification": "MPhil in Social Work",
+      "department": "Social Work",
+      "bio": "Sneha is a highly skilled psychiatric social worker specializing in addiction recovery and mental health interventions.\n\nAreas of Expertise:\n• Deaddiction & substance dependencies\n• Social skills training & cognitive retraining\n• Family counselling & psychoeducation\n• Mental health rehabilitation\n\nTherapeutic Approaches:\n• Cognitive Behavioural Therapy (CBT)\n• Motivational Enhancement Therapy (MET)\n• Family therapy & psychoeducation\n• Personalized recovery planning\n\nQualifications:\n• MPhil in Psychiatric Social Work — Manipal Academy of Higher Education\n\nLanguages: English, Telugu & Hindi",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=45153&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/sneha.jpg",
+      "display_order": 9
+    },
+    {
+      "id": "fd224f7a-fb44-4978-8eac-ed9372049a51",
+      "name": "Ms. Apeksha",
+      "qualification": "PGDP in Clinical Psychology",
+      "department": "Psychology",
+      "bio": "Apeksha is a licensed psychologist committed to providing personalized, compassionate care that meets each client where they are. Her approach is flexible and responsive, drawing from evidence-based methods.\n\nAreas of Expertise:\n• Stress & depression\n• Anxiety disorders\n• Adjustment disorders\n\nQualifications:\n• Professional Diploma in Clinical Psychology — Sweekaar Academy of Rehabilitation Sciences, Hyderabad\n\nLanguages: English & Hindi",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48264&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/apeksha.png",
+      "display_order": 10
+    },
+    {
+      "id": "c9eb28c5-6b55-48c7-a58b-69f264c4c6f5",
+      "name": "Ms. Purvi Maski",
+      "qualification": "MPhil Clinical Psychology",
+      "department": "Psychology",
+      "bio": "Purvi is an RCI-certified clinical psychologist and certified marital & family therapist, specializing in heterosexual and LGBTQ+ couples and families.\n\nAreas of Expertise:\n• Anxiety, depression & grief\n• Addiction & emotional disturbances\n• Life transitions & anger management\n• Stress, pre- & post-operative counselling\n• Pain management & adolescent issues\n• LGBTQ+ couple & family therapy\n\nTherapeutic Approaches:\n• Emotionally Focused Therapy (EFT)\n• Solution-driven, evidence-based integrative approach\n\nQualifications:\n• MPhil in Clinical Psychology\n• MSc Health Psychology — Central University, Hyderabad\n\nLanguages: Hindi, English & Gujarati",
+      "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=42507&eid=48109",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/purvi.jpg",
+      "display_order": 11
     }
   ]
 }
