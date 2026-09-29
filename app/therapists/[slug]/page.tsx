@@ -75,15 +75,27 @@ const SPECIALTY_ENUM: Record<string, string> = {
  * credentials, which on health content is the exact signal we are trying to
  * get right.
  */
+/**
+ * Practitioners who take appointments only by phone carry a `tel:` URL in
+ * `booking_url` rather than a link into the scheduling app.
+ */
+function isPhoneBooking(bookingUrl: string): boolean {
+  return bookingUrl.startsWith('tel:');
+}
+
 function buildSchema(doctor: Doctor) {
   const url = `${siteConfig.url}/therapists/${doctor.slug}/`;
   const specialty = SPECIALTY_ENUM[doctor.department];
   const author = toAuthor(doctor);
+  // ReserveAction describes a booking endpoint an agent can follow. A phone
+  // number is not one, so it is published as `telephone` instead of dressed up
+  // as a reservation target.
+  const byPhone = isPhoneBooking(doctor.bookingUrl);
 
   return [
     personSchema(author, {
       description: bioIntro(doctor.bio, 300),
-      bookingUrl: doctor.bookingUrl,
+      ...(byPhone ? {} : { bookingUrl: doctor.bookingUrl }),
     }),
     ...(author.isMedicalDoctor
       ? [
@@ -112,11 +124,15 @@ function buildSchema(doctor: Doctor) {
               '@type': 'MedicalTherapy',
               name: `${doctor.department} consultation`,
             },
-            potentialAction: {
-              '@type': 'ReserveAction',
-              target: doctor.bookingUrl,
-              name: `Book a session with ${doctor.name}`,
-            },
+            ...(byPhone
+              ? {}
+              : {
+                  potentialAction: {
+                    '@type': 'ReserveAction',
+                    target: doctor.bookingUrl,
+                    name: `Book a session with ${doctor.name}`,
+                  },
+                }),
           },
         ]
       : []),
@@ -183,6 +199,8 @@ export default async function TherapistPage({
   const doctor = await getDoctorBySlug(slug);
   if (!doctor) notFound();
 
+  const byPhone = isPhoneBooking(doctor.bookingUrl);
+
   const written = getPostsByAuthorSlug(doctor.slug);
   const reviewed = getPostsReviewedBy(doctor.slug);
 
@@ -248,12 +266,17 @@ export default async function TherapistPage({
 
                 <a
                   href={doctor.bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  {...(byPhone
+                    ? {}
+                    : { target: '_blank', rel: 'noopener noreferrer' })}
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#00373E] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#025a66] hover:shadow-lg sm:w-fit"
                 >
-                  <Calendar className="h-4 w-4" />
-                  Book a session
+                  {byPhone ? (
+                    <Phone className="h-4 w-4" />
+                  ) : (
+                    <Calendar className="h-4 w-4" />
+                  )}
+                  {byPhone ? 'Call to book' : 'Book a session'}
                 </a>
               </div>
             </div>

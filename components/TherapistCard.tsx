@@ -23,17 +23,36 @@ const CalendarIcon = () => (
   </svg>
 );
 
-const BookSessionButton = ({ bookingUrl }: { bookingUrl: string }) => (
-  <a
-    href={bookingUrl}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="mt-auto flex w-full items-center justify-center gap-2 rounded-full bg-[#00373E] px-5 py-2.5 text-xs font-semibold text-white shadow-md transition-all duration-300 hover:bg-[#025a66] hover:shadow-lg active:scale-[0.97] sm:px-6 sm:py-3 sm:text-sm"
+const PhoneIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className="h-4 w-4 fill-none stroke-current stroke-2"
   >
-    <CalendarIcon />
-    Book Session
-  </a>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
 );
+
+/**
+ * Practitioners whose only route to an appointment is a phone call carry a
+ * `tel:` URL in `booking_url`. Dialling is not "booking a session", and a
+ * `tel:` href opened with target="_blank" strands an empty tab on desktop —
+ * so both the label and the link behaviour switch.
+ */
+const BookSessionButton = ({ bookingUrl }: { bookingUrl: string }) => {
+  const isPhone = bookingUrl.startsWith('tel:');
+
+  return (
+    <a
+      href={bookingUrl}
+      {...(isPhone ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+      className="mt-auto flex w-full items-center justify-center gap-2 rounded-full bg-[#00373E] px-5 py-2.5 text-xs font-semibold text-white shadow-md transition-all duration-300 hover:bg-[#025a66] hover:shadow-lg active:scale-[0.97] sm:px-6 sm:py-3 sm:text-sm"
+    >
+      {isPhone ? <PhoneIcon /> : <CalendarIcon />}
+      {isPhone ? 'Call to Book' : 'Book Session'}
+    </a>
+  );
+};
 
 function FormattedBio({ text }: { text: string }) {
   const lines = text.split('\n');
