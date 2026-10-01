@@ -2,11 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ChatBubble from '@/components/ChatBubble';
 
+// The page the widget renders on, which a test can move to /arel-ops.
+const nav = vi.hoisted(() => ({ pathname: '/' }));
+vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
+
 function reply(body: Record<string, unknown>) {
   return { ok: true, json: async () => body };
 }
 
 beforeEach(() => {
+  nav.pathname = '/';
   sessionStorage.clear();
   localStorage.clear();
   vi.stubGlobal(
@@ -132,5 +137,32 @@ describe('ChatBubble', () => {
   it('announces new messages to a screen reader', async () => {
     const log = await open();
     expect(log.getAttribute('aria-live')).toBe('polite');
+  });
+
+  // Right above the chat button sits the clinic's WhatsApp number, which the
+  // CRM bot answers: some people would rather talk in WhatsApp itself.
+  it('offers WhatsApp above the chat, opening the clinic number in a new tab', () => {
+    render(<ChatBubble />);
+    const link = screen.getByRole('link', { name: /message us on whatsapp/i });
+    expect(link.getAttribute('href')).toBe('https://wa.me/919000720003');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  // The open chat window covers that corner of the screen.
+  it('hides the WhatsApp button while the chat is open', async () => {
+    await open();
+    expect(screen.queryByRole('link', { name: /message us on whatsapp/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /close conversation/i }));
+    expect(await screen.findByRole('link', { name: /message us on whatsapp/i })).toBeTruthy();
+  });
+
+  // /arel-ops is the clinic's internal operations page, not somewhere a
+  // patient lands. The old WhatsApp button stayed off it; both launchers do.
+  it('stays off the internal /arel-ops page', () => {
+    nav.pathname = '/arel-ops';
+    render(<ChatBubble />);
+    expect(screen.queryByRole('button', { name: /chat/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /whatsapp/i })).toBeNull();
   });
 });

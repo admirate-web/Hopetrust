@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { MessageCircle, X, ArrowUp, ArrowUpRight } from 'lucide-react';
 import { getLogoUrl } from '@/lib/assets';
+import { siteConfig } from '@/lib/config';
+import WhatsAppButton from '@/components/WhatsAppButton';
 
 /**
  * The website chat bubble. Every decision about what to say is made by the CRM
@@ -15,7 +18,6 @@ import { getLogoUrl } from '@/lib/assets';
  */
 
 const STATE_KEY = 'ht_chat_state';
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919000720003';
 
 const FAILURE_LINE =
   "I can't reach our team just now. You can message us on WhatsApp instead — someone will pick it up.";
@@ -67,7 +69,15 @@ function writeState(state: ChatState) {
   }
 }
 
+// Not on /arel-ops, the clinic's internal operations page: nobody there is a
+// patient looking for help, and the old WhatsApp button stayed off it too.
 export default function ChatBubble() {
+  const pathname = usePathname();
+  if (pathname?.startsWith('/arel-ops')) return null;
+  return <Bubble />;
+}
+
+function Bubble() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
@@ -258,7 +268,7 @@ export default function ChatBubble() {
 
                     {m.failed && (
                       <a
-                        href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                        href={siteConfig.contact.whatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-[#ED7428] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#d4631f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40 focus-visible:ring-offset-2"
@@ -356,6 +366,10 @@ export default function ChatBubble() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* WhatsApp sits 12px above the chat launcher (bottom-6 + h-14 + 0.75rem)
+          and goes while the window is open: the window covers this corner. */}
+      {!open && <WhatsAppButton className="fixed bottom-[5.75rem] right-4 z-50 sm:right-6" />}
 
       <button
         ref={launcherRef}

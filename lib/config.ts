@@ -1,6 +1,7 @@
-// WHATSAPP CRM DISABLED — uncomment when new CRM is integrated
-// const whatsappNumber =
-//   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919000720003';
+// The CRM's WhatsApp number, which the WhatsApp bot answers. The chat bubble's
+// WhatsApp button and its fallback link both open it.
+const whatsappNumber =
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919000720003';
 
 export const siteConfig = {
   name: 'Hope Trust India',
@@ -12,8 +13,7 @@ export const siteConfig = {
     phone: '+91 9000850001',
     phone2: '+91 9000720003',
     trainingPhone: '+91 9866822240',
-    // WHATSAPP CRM DISABLED — uncomment when new CRM is integrated
-    // whatsappUrl: `https://wa.me/${whatsappNumber}`,
+    whatsappUrl: `https://wa.me/${whatsappNumber}`,
     address: {
       line1: 'C/o, UCCHVAS Rehabilitation Center,',
       line2: 'Plot no. 564-A-36-111,',
