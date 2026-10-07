@@ -264,20 +264,25 @@ export default async function TherapistPage({
                   {doctor.department}
                 </span>
 
-                <a
-                  href={doctor.bookingUrl}
-                  {...(byPhone
-                    ? {}
-                    : { target: '_blank', rel: 'noopener noreferrer' })}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#00373E] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#025a66] hover:shadow-lg sm:w-fit"
-                >
-                  {byPhone ? (
-                    <Phone className="h-4 w-4" />
-                  ) : (
+                {byPhone ? (
+                  <p className="mt-5 text-sm font-semibold text-[#00373E] sm:text-base">
+                    Call{' '}
+                    <a href={doctor.bookingUrl} className="whitespace-nowrap hover:underline">
+                      {doctor.bookingUrl.slice('tel:'.length)}
+                    </a>{' '}
+                    to book
+                  </p>
+                ) : (
+                  <a
+                    href={doctor.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#00373E] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#025a66] hover:shadow-lg sm:w-fit"
+                  >
                     <Calendar className="h-4 w-4" />
-                  )}
-                  {byPhone ? 'Call to book' : 'Book a session'}
-                </a>
+                    Book a session
+                  </a>
+                )}
               </div>
             </div>
           </div>
