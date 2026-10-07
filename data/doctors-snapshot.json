@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-09-29",
+  "capturedAt": "2026-10-07",
   "doctors": [
     {
       "id": "34658552-a95d-42e0-a907-e1d2c583e534",
@@ -72,6 +72,16 @@
       "display_order": 7
     },
     {
+      "id": "7d91ce33-fc93-4b06-8c3f-2912a685ba48",
+      "name": "Ms. Chandni Singh",
+      "qualification": "Clinical Psychologist",
+      "department": "Psychology",
+      "bio": "Chandni is a clinical psychologist with 2 years of experience working with children and adults across a range of psychological, emotional and behavioural concerns. She has worked as a Consultant Clinical Psychologist in India and as a Behavioural Specialist in the United States.\n\nShe believes therapy should provide a safe, confidential and non-judgemental space where clients feel heard and understood. Her approach is practical and individualised, helping clients develop healthier ways of coping and work towards meaningful, lasting change.\n\nAreas of Expertise:\n• Anxiety & stress\n• Obsessive-Compulsive Disorder (OCD)\n• Emotional & behavioural difficulties\n• Alcohol dependence\n• Psychological assessment\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Exposure & Response Prevention (ERP)\n• Counselling & therapeutic support\n\nLanguages: English & Hindi",
+      "booking_url": "tel:+919000850001",
+      "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Chandni-Singh.jpg",
+      "display_order": 8
+    },
+    {
       "id": "3b9a894c-0450-4a03-b6ad-47ffdb911ab6",
       "name": "Ms. Akansha Kabra",
       "qualification": "MA Psychology",
@@ -79,7 +89,7 @@
       "bio": "Akansha is a Masters in Psychology with an eclectic therapeutic approach, using a variety of therapies tailored to each client's unique needs and overall well-being.\n\nAreas of Expertise:\n• Anxiety & anger management\n• Stress management & depression\n• Adjustment & self-esteem issues\n• Socio-emotional concerns\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Relaxation-based techniques\n• Imago Relationship Therapy\n• Play Therapy\n\nLanguages: Hindi & English",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48126&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Akansha-Kabra.jpg",
-      "display_order": 8
+      "display_order": 9
     },
     {
       "id": "c9f68f87-f08b-4836-8800-d3e8c908969c",
@@ -89,7 +99,7 @@
       "bio": "Arani is an RCI-certified clinical psychologist with over 6 years of experience in evidence-based psychotherapies.\n\nAreas of Expertise:\n• Depression & OCD spectrum disorders\n• Anxiety & ADHD\n• Substance use & personality disorders\n• Couple & marital issues\n• Psychological assessments\n\nTherapeutic Approaches:\n• Cognitive Behaviour Therapy (CBT)\n• Rational Emotive Behaviour Therapy (REBT)\n• Acceptance & Commitment Therapy (ACT)\n• Exposure & Response Prevention (ERP)\n• Mindfulness-based therapies & NLP\n\nQualifications:\n• Professional Diploma in Clinical Psychology\n• MSc Psychology — Acharya Nagarjuna University\n\nLanguages: English, Telugu & Hindi",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48146&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/Arani-Shankar.png",
-      "display_order": 9
+      "display_order": 10
     },
     {
       "id": "f18a4b51-8ee0-4f1f-8c98-e2e4ef6bc9ca",
@@ -99,7 +109,7 @@
       "bio": "Sneha is a highly skilled psychiatric social worker specializing in addiction recovery and mental health interventions.\n\nAreas of Expertise:\n• Deaddiction & substance dependencies\n• Social skills training & cognitive retraining\n• Family counselling & psychoeducation\n• Mental health rehabilitation\n\nTherapeutic Approaches:\n• Cognitive Behavioural Therapy (CBT)\n• Motivational Enhancement Therapy (MET)\n• Family therapy & psychoeducation\n• Personalized recovery planning\n\nQualifications:\n• MPhil in Psychiatric Social Work — Manipal Academy of Higher Education\n\nLanguages: English, Telugu & Hindi",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=45153&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/sneha.jpg",
-      "display_order": 10
+      "display_order": 11
     },
     {
       "id": "fd224f7a-fb44-4978-8eac-ed9372049a51",
@@ -109,7 +119,7 @@
       "bio": "Apeksha is a licensed psychologist committed to providing personalized, compassionate care that meets each client where they are. Her approach is flexible and responsive, drawing from evidence-based methods.\n\nAreas of Expertise:\n• Stress & depression\n• Anxiety disorders\n• Adjustment disorders\n\nQualifications:\n• Professional Diploma in Clinical Psychology — Sweekaar Academy of Rehabilitation Sciences, Hyderabad\n\nLanguages: English & Hindi",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=48264&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/apeksha.png",
-      "display_order": 11
+      "display_order": 12
     },
     {
       "id": "c9eb28c5-6b55-48c7-a58b-69f264c4c6f5",
@@ -119,7 +129,7 @@
       "bio": "Purvi is an RCI-certified clinical psychologist and certified marital & family therapist, specializing in heterosexual and LGBTQ+ couples and families.\n\nAreas of Expertise:\n• Anxiety, depression & grief\n• Addiction & emotional disturbances\n• Life transitions & anger management\n• Stress, pre- & post-operative counselling\n• Pain management & adolescent issues\n• LGBTQ+ couple & family therapy\n\nTherapeutic Approaches:\n• Emotionally Focused Therapy (EFT)\n• Solution-driven, evidence-based integrative approach\n\nQualifications:\n• MPhil in Clinical Psychology\n• MSc Health Psychology — Central University, Hyderabad\n\nLanguages: Hindi, English & Gujarati",
       "booking_url": "https://meet-my-doctor.firebaseapp.com/#/?uid=42507&eid=48109",
       "photo": "https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/Doctor%20images/purvi.jpg",
-      "display_order": 12
+      "display_order": 13
     }
   ]
 }
