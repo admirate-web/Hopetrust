@@ -105,6 +105,43 @@ export const mentalHealthFaqs: Faq[] = [
   },
 ];
 
+/**
+ * The therapist directory. Its searchers are choosing a person ("psychologist
+ * in hyderabad", "therapist near me"), so these answer how choosing and
+ * booking work rather than repeating what therapy is.
+ */
+export const bookingFaqs: Faq[] = [
+  {
+    question: 'How do I book a session?',
+    answer:
+      'Choose a practitioner and use the Book Session button on their card or profile to pick a date and time, or message us on WhatsApp. A few practitioners take bookings by phone, and their card shows the number to call. All appointments are pre-booked.',
+  },
+  {
+    question: 'Should I see a psychologist or a psychiatrist?',
+    answer:
+      'A psychiatrist is a medical doctor and can prescribe medication; a psychologist works through talking therapy and psychological assessment. If you are unsure, start with a psychologist — our psychologists and psychiatrist work together, so you can be referred on if medication may help.',
+  },
+  {
+    question: 'Can I choose which therapist I see?',
+    answer:
+      'Yes. Every practitioner has a profile listing their qualifications, the concerns they work with and the languages they speak, and you book with the person you choose rather than being assigned one.',
+  },
+  {
+    question: 'Are sessions available online?',
+    answer: `Yes. Every practitioner sees clients online as well as in person at our centre in ${LOCATION}. For online sessions, a private link is sent to you by email or WhatsApp.`,
+  },
+  {
+    question: 'Where is Hope Trust, and when is it open?',
+    answer:
+      'Our centre is at C/o UCCHVAS Rehabilitation Center, Plot no. 564-A-36-111, Opp. Lotus Pond Road, MLA Colony, Banjara Hills, Hyderabad 500034. We are open Monday to Saturday, 10 AM to 7 PM IST, by appointment.',
+  },
+  {
+    question: 'Is what I share in a session confidential?',
+    answer:
+      'Yes. What you discuss stays between you and your therapist. Your therapist will explain at the start how confidentiality works, including the narrow circumstances in which it does not apply.',
+  },
+];
+
 export const interventionFaqs: Faq[] = [
   {
     question: 'What is an intervention?',

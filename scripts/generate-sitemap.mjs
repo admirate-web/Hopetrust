@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
 
@@ -25,22 +26,53 @@ if (/netlify\.app/i.test(SITE_URL)) {
   );
 }
 
+/**
+ * Top-level pages. `sources` are the files whose last commit dates the page's
+ * <lastmod>: a sitemap that stamps every page with the build date tells search
+ * engines nothing, while an accurate date gets changed pages recrawled first.
+ * The specialty pages mirror lib/specialties.ts; verifyStaticPages() fails the
+ * build if a listed page was not emitted, and warns about built pages missing
+ * from this list.
+ */
 const staticPages = [
-  { path: '/',                       changefreq: 'weekly',  priority: '1.0', title: 'Home', desc: 'Mental health and addiction recovery care in Hyderabad.' },
-  { path: '/about/',                 changefreq: 'monthly', priority: '0.9', title: 'About Hope Trust', desc: 'Our story since 2002, our team, and our evidence-based approach.' },
-  { path: '/mental-health/',         changefreq: 'monthly', priority: '0.9', title: 'Mental Health Services', desc: 'Therapy, psychiatry, couples and family therapy for anxiety, depression, trauma, ADHD, OCD and grief.' },
-  { path: '/addiction/',             changefreq: 'monthly', priority: '0.9', title: 'Addiction Recovery Services', desc: 'Outpatient and online treatment for alcohol, drug, nicotine and behavioural addiction.' },
-  { path: '/training/',              changefreq: 'monthly', priority: '0.9', title: 'Training Programs', desc: 'Professional training and certification in mental health and addiction counselling.' },
-  { path: '/corporate-wellness/',    changefreq: 'monthly', priority: '0.8', title: 'Corporate Wellness', desc: 'Employee mental health programmes, workshops and structured workplace support.' },
-  { path: '/intervention-services/', changefreq: 'monthly', priority: '0.8', title: 'Intervention Services', desc: 'Professional intervention to help a loved one seek addiction treatment.' },
-  { path: '/blogs/',                 changefreq: 'weekly',  priority: '0.8', title: 'Blog', desc: 'Articles on mental health, therapy, addiction recovery and wellness.' },
-  { path: '/book-your-session/',     changefreq: 'monthly', priority: '0.7', title: 'Book Your Session', desc: 'Browse therapists and psychiatrists and book an in-clinic or online session.' },
-  { path: '/contact/',               changefreq: 'monthly', priority: '0.7', title: 'Contact', desc: 'Location, hours and contact details for the Banjara Hills clinic.' },
-  { path: '/terms-and-conditions/',  changefreq: 'monthly', priority: '0.3' },
-  { path: '/cancellation-policy/',   changefreq: 'monthly', priority: '0.3' },
-  { path: '/privacy-policy/',        changefreq: 'monthly', priority: '0.3' },
-  { path: '/sitemap/',               changefreq: 'monthly', priority: '0.3' },
+  { path: '/',                       changefreq: 'weekly',  priority: '1.0', title: 'Home', desc: 'Mental health and de-addiction centre in Banjara Hills, Hyderabad, since 2002.', sources: ['app/page.tsx', 'app/layout.tsx', 'components/HeroSection.tsx', 'components/WhatWeOfferSection.tsx'] },
+  { path: '/book-your-session/',     changefreq: 'weekly',  priority: '0.9', title: 'Psychologists & Therapists in Hyderabad', desc: 'Every Hope Trust practitioner, with qualifications, expertise and languages; book in person or online.', sources: ['app/book-your-session', 'data/doctors-snapshot.json'] },
+  { path: '/mental-health/',         changefreq: 'monthly', priority: '0.9', title: 'Therapy, Counselling & Psychiatry', desc: 'Therapy, psychiatry, couples and family therapy for anxiety, depression, trauma, ADHD, OCD and grief.', sources: ['app/mental-health', 'lib/faqs.ts'] },
+  { path: '/addiction/',             changefreq: 'monthly', priority: '0.9', title: 'Alcohol & Drug De-Addiction Treatment', desc: 'Outpatient and online de-addiction for alcohol, drugs, nicotine and behavioural addictions, with programme costs.', sources: ['app/addiction', 'lib/faqs.ts'] },
+  { path: '/couples-counselling/',   changefreq: 'monthly', priority: '0.9', title: 'Couples & Marriage Counselling', desc: 'Couples and marriage counselling in Hyderabad and online: communication, conflict, trust and family pressure.', sources: ['app/couples-counselling', 'lib/specialties.ts', 'components/SpecialtyPage.tsx', 'components/specialty', 'public/images/services'] },
+  { path: '/child-psychologist/',    changefreq: 'monthly', priority: '0.9', title: 'Child & Adolescent Psychologists', desc: 'Psychologists for children, teenagers and students: anxiety, behaviour, ADHD testing, exam stress, family therapy.', sources: ['app/child-psychologist', 'lib/specialties.ts', 'components/SpecialtyPage.tsx', 'components/specialty', 'public/images/services'] },
+  { path: '/ocd-treatment/',         changefreq: 'monthly', priority: '0.9', title: 'OCD Treatment', desc: 'OCD treatment with CBT and exposure and response prevention (ERP), with psychiatric care where needed.', sources: ['app/ocd-treatment', 'lib/specialties.ts', 'components/SpecialtyPage.tsx', 'components/specialty', 'public/images/services'] },
+  { path: '/online-therapy/',        changefreq: 'monthly', priority: '0.9', title: 'Online Therapy & Counselling', desc: 'How online sessions with Hope Trust psychologists, psychiatrist and counsellors work.', sources: ['app/online-therapy', 'lib/specialties.ts', 'components/SpecialtyPage.tsx', 'components/specialty', 'public/images/services'] },
+  { path: '/intervention-services/', changefreq: 'monthly', priority: '0.8', title: 'Intervention Services', desc: 'Professional intervention to help a loved one seek addiction treatment.', sources: ['app/intervention-services'] },
+  { path: '/about/',                 changefreq: 'monthly', priority: '0.8', title: 'About Hope Trust', desc: 'Our story since 2002, our team, and our evidence-based approach.', sources: ['app/about'] },
+  { path: '/training/',              changefreq: 'monthly', priority: '0.8', title: 'Training Programs', desc: 'Professional training and certification in mental health and addiction counselling.', sources: ['app/training'] },
+  { path: '/corporate-wellness/',    changefreq: 'monthly', priority: '0.7', title: 'Corporate Wellness', desc: 'Employee mental health programmes, workshops and structured workplace support.', sources: ['app/corporate-wellness'] },
+  { path: '/blogs/',                 changefreq: 'weekly',  priority: '0.8', title: 'Blog', desc: 'Articles on mental health, therapy, addiction recovery and wellness.', sources: ['app/blogs', 'content/blogs'] },
+  { path: '/contact/',               changefreq: 'monthly', priority: '0.7', title: 'Contact', desc: 'Location, hours and contact details for the Banjara Hills clinic.', sources: ['app/contact'] },
+  { path: '/terms-and-conditions/',  changefreq: 'yearly',  priority: '0.3', sources: ['app/terms-and-conditions'] },
+  { path: '/cancellation-policy/',   changefreq: 'yearly',  priority: '0.3', sources: ['app/cancellation-policy'] },
+  { path: '/privacy-policy/',        changefreq: 'yearly',  priority: '0.3', sources: ['app/privacy-policy'] },
+  { path: '/sitemap/',               changefreq: 'monthly', priority: '0.3', sources: ['app/sitemap'] },
 ];
+
+/**
+ * Date of the last commit touching any of `sources`, as YYYY-MM-DD. Falls back
+ * to today when git is unavailable (a shallow or missing clone), which is the
+ * old behaviour, so a build never fails on it.
+ */
+function lastCommitDate(sources) {
+  if (!sources || sources.length === 0) return today();
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', ...sources], {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(out) ? out : today();
+  } catch {
+    return today();
+  }
+}
 
 /** Blog posts with their real dates, newest first. */
 function getBlogPosts() {
@@ -188,6 +220,48 @@ function verifyArchiveUrls(urls) {
   return urls;
 }
 
+/**
+ * Every listed static page must have been built, or the sitemap advertises a
+ * 404. In the other direction, a top-level page that was built but is not
+ * listed is only a warning — but it is how a new landing page ends up out of
+ * the sitemap and llms.txt without anyone noticing.
+ */
+function verifyStaticPages(pages) {
+  if (!fs.existsSync(OUT_DIR)) return pages;
+
+  const missing = pages.filter(
+    (p) => !fs.existsSync(path.join(OUT_DIR, p.path.replace(/^\/|\/$/g, ''), 'index.html'))
+  );
+  if (missing.length) {
+    console.error(
+      `\n  ERROR: sitemap lists pages that were not built:\n` +
+        missing.map((p) => `    ${p.path}`).join('\n') +
+        `\n  Remove them from staticPages in scripts/generate-sitemap.mjs, or restore the route.\n`
+    );
+    process.exit(1);
+  }
+
+  // Built routes that are deliberately not in the sitemap.
+  const UNLISTED = new Set([
+    '_next', 'blogs', 'therapists', 'blog-images', 'arel-ops', 'enrollment-success', '404',
+  ]);
+  const listed = new Set(pages.map((p) => p.path.replace(/^\/|\/$/g, '')));
+  const unlisted = fs
+    .readdirSync(OUT_DIR, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !UNLISTED.has(e.name) && !listed.has(e.name))
+    .filter((e) => fs.existsSync(path.join(OUT_DIR, e.name, 'index.html')))
+    .map((e) => `/${e.name}/`);
+  if (unlisted.length) {
+    console.warn(
+      `\n  WARNING: built pages missing from the sitemap and llms.txt:\n` +
+        unlisted.map((u) => `    ${u}`).join('\n') +
+        `\n  Add them to staticPages in scripts/generate-sitemap.mjs.\n`
+    );
+  }
+
+  return pages;
+}
+
 function today() {
   return new Date().toISOString().split('T')[0];
 }
@@ -245,13 +319,15 @@ function getArchiveUrls(posts) {
 }
 
 function buildSitemap(posts, therapists, archiveUrls) {
-  const now = today();
+  // Archives change when posts do; profiles when the roster or template does.
+  const archiveLastmod = lastCommitDate(['content/blogs', 'app/blogs']);
+  const therapistLastmod = lastCommitDate(['data/doctors-snapshot.json', 'app/therapists', 'lib/bio.ts']);
 
   const urls = [
     ...archiveUrls.map(
       (u) => `  <url>
     <loc>${xmlEscape(`${SITE_URL}${u}`)}</loc>
-    <lastmod>${now}</lastmod>
+    <lastmod>${archiveLastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>`
@@ -259,7 +335,7 @@ function buildSitemap(posts, therapists, archiveUrls) {
     ...staticPages.map(
       (page) => `  <url>
     <loc>${SITE_URL}${page.path}</loc>
-    <lastmod>${now}</lastmod>
+    <lastmod>${lastCommitDate(page.sources)}</lastmod>
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
   </url>`
@@ -267,7 +343,7 @@ function buildSitemap(posts, therapists, archiveUrls) {
     ...therapists.map(
       (t) => `  <url>
     <loc>${xmlEscape(`${SITE_URL}/therapists/${t.slug}/`)}</loc>
-    <lastmod>${now}</lastmod>
+    <lastmod>${therapistLastmod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>`
@@ -387,11 +463,15 @@ function buildLlmsTxt(posts, therapists) {
 
   return `# Hope Trust
 
-> Hope Trust is a mental health and addiction recovery centre in Banjara Hills,
-> Hyderabad, India, operating since 2002. We provide therapy, psychiatry,
-> outpatient and online addiction treatment, professional intervention services,
-> corporate wellness programmes, and clinical training. Care is delivered by a
-> multidisciplinary team of 30+ professionals.
+> Hope Trust (Google Business Profile: "Hope Trust - Psychological Wellness
+> Centre") is a mental health and de-addiction centre in Banjara Hills,
+> Hyderabad, India, operating since 2002. We provide therapy and counselling,
+> psychiatry, couples and marriage counselling, child and adolescent psychology
+> (including ADHD testing), OCD treatment with exposure and response prevention,
+> outpatient and online addiction treatment for alcohol, drugs, nicotine and
+> gambling, professional intervention services, corporate wellness programmes,
+> and clinical training. Every practitioner also sees clients online. Care is
+> delivered by a multidisciplinary team of 30+ professionals.
 
 Hope Trust is operated by Arel Hope Recovery Services LLP. Content on this site
 is general information about mental health and addiction, not a substitute for
@@ -427,6 +507,7 @@ ${articles}
 // --- write ---------------------------------------------------------------
 
 const posts = getBlogPosts();
+verifyStaticPages(staticPages);
 const therapists = verifyTherapistSlugs(getTherapists());
 const archiveUrls = verifyArchiveUrls(getArchiveUrls(posts));
 const targetDir = fs.existsSync(OUT_DIR) ? OUT_DIR : path.join(ROOT, 'public');

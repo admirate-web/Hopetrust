@@ -52,6 +52,10 @@ const sections: SitemapSection[] = [
     links: [
       { label: 'Mental Health', href: '/mental-health' },
       { label: 'Addiction Services', href: '/addiction' },
+      { label: 'Couples & Marriage Counselling', href: '/couples-counselling/' },
+      { label: 'Child & Adolescent Psychologists', href: '/child-psychologist/' },
+      { label: 'OCD Treatment', href: '/ocd-treatment/' },
+      { label: 'Online Therapy', href: '/online-therapy/' },
       { label: 'Corporate Wellness', href: '/corporate-wellness' },
       { label: 'Intervention Services', href: '/intervention-services' },
       { label: 'Training', href: '/training' },

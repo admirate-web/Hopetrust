@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-10-11T19:14:10.062Z",
+        "reason": "Claude triage: the only match is the pre-existing .blog-content blockquote left rule (in HEAD before this session) - standard quotation styling for article blockquotes, not a card"
+      }
+    ]
+  }
+}

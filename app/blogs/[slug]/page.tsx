@@ -48,10 +48,13 @@ export async function generateMetadata({
   if (!post) return { title: 'Post Not Found' };
 
   const [author] = await getAuthorsBySlug([post.authorSlug]);
+  const description = post.seoDescription || post.excerpt;
 
   return {
-    title: post.title,
-    description: post.excerpt,
+    // A search title, where set, is used exactly as written: it is chosen to
+    // match what people search and is sized to fit without the site suffix.
+    title: post.seoTitle ? { absolute: post.seoTitle } : post.title,
+    description,
     authors: author
       ? [{ name: author.name, url: author.url }]
       : [{ name: post.author }],
@@ -65,8 +68,8 @@ export async function generateMetadata({
       canonical: `/blogs/${slug}/`,
     },
     openGraph: {
-      title: post.title,
-      description: post.excerpt,
+      title: post.seoTitle || post.title,
+      description,
       type: 'article',
       url: `${siteConfig.url}/blogs/${slug}/`,
       publishedTime: post.date,
@@ -130,7 +133,8 @@ function JsonLd({
     mainEntityOfPage: pageNode,
     url,
     headline: post.title.slice(0, 110),
-    description: post.excerpt,
+    description: post.seoDescription || post.excerpt,
+    ...(post.summary && { abstract: post.summary }),
     datePublished: post.date,
     dateModified: post.modified || post.date,
     inLanguage: 'en-IN',
@@ -309,8 +313,14 @@ export default async function BlogPostPage({
                 <Byline author={author} fallback={post.author} />
                 <span className="inline-flex items-center gap-1 sm:gap-1.5">
                   <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  {formatDate(post.date)}
+                  <time dateTime={post.date.slice(0, 10)}>{formatDate(post.date)}</time>
                 </span>
+                {post.modified && post.modified.slice(0, 10) > post.date.slice(0, 10) && (
+                  <span className="inline-flex items-center gap-1 sm:gap-1.5">
+                    Updated{' '}
+                    <time dateTime={post.modified.slice(0, 10)}>{formatDate(post.modified)}</time>
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1 sm:gap-1.5">
                   <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {post.readingTime}
@@ -321,6 +331,28 @@ export default async function BlogPostPage({
                 <ReviewNotice reviewer={reviewer} reviewedOn={post.reviewedOn} />
               )}
             </div>
+
+            {/* The direct answer, before the article. Most searches that reach
+                these posts are questions ("name a common phobia", "psychology
+                of people who don't post on social media"); answering in the
+                first lines is what wins the featured snippet and the AI-answer
+                citation, and keeps the reader who wanted only that. */}
+            {post.summary && (
+              <section
+                aria-labelledby="summary-heading"
+                className="mt-4 rounded-2xl bg-[#FFF7ED] px-4 py-5 ring-1 ring-[#ED7428]/15 sm:mt-8 sm:rounded-[28px] sm:px-8 sm:py-7 lg:px-10"
+              >
+                <h2
+                  id="summary-heading"
+                  className="text-xs font-semibold uppercase tracking-[0.14em] text-[#ED7428] sm:text-sm"
+                >
+                  In short
+                </h2>
+                <p className="mt-2 text-base leading-relaxed text-gray-800 sm:text-lg">
+                  {post.summary}
+                </p>
+              </section>
+            )}
 
             {/* Article body */}
             <div className="mt-4 rounded-2xl bg-white px-4 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.04)] sm:mt-8 sm:rounded-[28px] sm:px-8 sm:py-8 lg:px-10 lg:py-10">

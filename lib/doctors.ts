@@ -105,9 +105,12 @@ export function getDepartments(doctors: Doctor[]): string[] {
   return Array.from(new Set(doctors.map((d) => d.department))).sort();
 }
 
-/** First paragraph of a bio, for card previews and meta descriptions. */
-export function bioIntro(bio: string, maxLength = 160): string {
-  const intro = bio.split('\n\n')[0].replace(/\s+/g, ' ').trim();
-  if (intro.length <= maxLength) return intro;
-  return intro.slice(0, intro.lastIndexOf(' ', maxLength)).trimEnd() + '…';
-}
+// Pure bio parsing lives in lib/bio so that modules needing it (authors,
+// schema builders, tests) do not also construct the Supabase client above.
+export {
+  bioIntro,
+  bioSection,
+  bioLanguages,
+  languagesSpoken,
+  practitionerRole,
+} from '@/lib/bio';

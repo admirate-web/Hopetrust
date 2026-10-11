@@ -25,6 +25,12 @@ describe('topicFor', () => {
     ['6 Ways to Deal With Your Anxiety', 'mental-health'],
     ['Everything You Should Know About Depression', 'mental-health'],
     ['Managing Burnout at Work', 'corporate'],
+    ['Top 10 Reasons for Divorce', 'couples'],
+    ['How Couples Can Rebuild Trust in Their Relationship', 'couples'],
+    ['What Challenges Do Teenagers Face Today?', 'child'],
+    ['Symptoms and Treatment of ADHD in Children', 'child'],
+    ['8 Reasons You Should Consider Online Counselling', 'online'],
+    ['Living With Intrusive Thoughts and OCD', 'ocd'],
   ])('routes %s to %s', (title, expected) => {
     expect(topicFor(post({ title, slug: 'x' })).id).toBe(expected);
   });
@@ -35,6 +41,18 @@ describe('topicFor', () => {
     expect(
       topicFor(post({ title: 'Strategies for Helping a Loved One Who Refuses Help' })).id
     ).toBe('intervention');
+  });
+
+  it('keeps addiction ahead of relationships', () => {
+    // A post about what drinking does to a marriage is still, first, about
+    // drinking — the addiction page serves that reader better.
+    expect(topicFor(post({ title: 'Addiction and Relationships' })).id).toBe('addiction');
+  });
+
+  it('sends a post about online therapy for a breakup to the online page', () => {
+    expect(
+      topicFor(post({ title: 'How can online therapy help me deal with post-breakup heartache?' })).id
+    ).toBe('online');
   });
 
   it('reads the slug as well as the title', () => {

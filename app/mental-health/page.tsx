@@ -40,6 +40,8 @@ type FocusConfig = {
   cardBg: string;
   imageSrc: string;
   imageAlt: string;
+  /** A page that covers this service in depth. */
+  more?: { label: string; href: string };
 };
 
 const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
@@ -55,6 +57,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     cardBg: '#F9E6D0',
     imageSrc: getAssetUrl('mental health therapy.png'),
     imageAlt: 'Therapy illustration',
+    more: { label: 'Find a therapist', href: '/book-your-session/' },
   },
   psychiatry: {
     label: 'Medications',
@@ -81,6 +84,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     cardBg: '#EDE6B1',
     imageSrc: getAssetUrl('couple therapy.png'),
     imageAlt: 'Couples therapy illustration',
+    more: { label: 'Couples & marriage counselling', href: '/couples-counselling/' },
   },
   family: {
     label: 'Family Therapy',
@@ -221,19 +225,18 @@ const ConcernsCarousel = memo(function ConcernsCarousel() {
 
           {/* Text */}
           <div className="w-full md:w-[60%] flex flex-col justify-center px-6 sm:px-10 lg:px-12 py-8 sm:py-10">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`text-${active}`}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.4 }}
-                className="flex flex-col gap-4"
+            {/* Every slide's text is rendered and the inactive ones hidden, so
+                all three topics are in the static HTML — not just the first. */}
+            {CAROUSEL_SLIDES.map((s, idx) => (
+              <div
+                key={s.title}
+                hidden={idx !== active}
+                className={`${idx === active ? "flex animate-fade-in" : "hidden"} flex-col gap-4`}
               >
                 <h3 className="text-xl sm:text-2xl lg:text-[32px] font-bold leading-tight text-white">
-                  {slide.title}
+                  {s.title}
                 </h3>
-                {slide.paragraphs.map((p, i) => (
+                {s.paragraphs.map((p, i) => (
                   <p
                     key={i}
                     className="text-sm sm:text-base lg:text-lg font-normal leading-relaxed text-white"
@@ -241,13 +244,13 @@ const ConcernsCarousel = memo(function ConcernsCarousel() {
                     {p}
                   </p>
                 ))}
-                {slide.bold && (
+                {s.bold && (
                   <p className="text-sm sm:text-base lg:text-lg font-bold leading-relaxed text-white">
-                    {slide.bold}
+                    {s.bold}
                   </p>
                 )}
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            ))}
 
             {/* Dots */}
             <div className="flex gap-3 mt-6">
@@ -353,7 +356,10 @@ export default function MentalHealthPage() {
             className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 sm:px-6 lg:px-8 text-center text-white"
           >
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-semibold tracking-[0.18em] uppercase">
-              Mental Health
+              Mental Health{' '}
+              <span className="mt-5 block text-base font-medium normal-case tracking-normal sm:text-lg md:text-xl lg:text-2xl">
+                Therapy and psychiatry in Hyderabad
+              </span>
             </h1>
 
             <div className="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl font-medium leading-tight">
@@ -438,7 +444,7 @@ export default function MentalHealthPage() {
             {/* Outer card */}
             <div className="flex h-auto md:min-h-[650px] w-full max-w-[1170px] flex-col rounded-[28px] sm:rounded-[44px] md:rounded-[84px] bg-transparent overflow-hidden">
               {/* Top strip with tabs */}
-              <div className="flex bg-[#FFE3C7]">
+              <div className="flex bg-[#FFE3C7]" role="tablist" aria-label="Mental health services">
                 {(Object.keys(FOCUS_SECTIONS) as FocusKey[]).map((key) => {
                   const isActive = key === activeFocus;
                   const activeBgClass =
@@ -453,6 +459,10 @@ export default function MentalHealthPage() {
                     <button
                       key={key}
                       type="button"
+                      role="tab"
+                      id={`focus-tab-${key}`}
+                      aria-selected={isActive}
+                      aria-controls={`focus-panel-${key}`}
                       onClick={() => setActiveFocus(key)}
                       className={`flex-1 px-1 py-2.5 sm:px-2 sm:py-3 md:px-4 md:py-4 text-[9px] sm:text-xs md:text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40 focus-visible:ring-offset-4 ${
                         isActive
@@ -466,84 +476,97 @@ export default function MentalHealthPage() {
                 })}
               </div>
 
-              {/* Content card */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeFocus}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{
-                    duration: 0.4,
-                    ease: [0.22, 0.61, 0.36, 1],
-                  }}
-                  className="flex-1 px-5 py-8 sm:px-10 sm:py-12 shadow-[0_24px_60px_rgba(0,0,0,0.06)] flex flex-col md:flex-row items-center gap-6 md:gap-12"
-                  style={{
-                    backgroundColor: FOCUS_SECTIONS[activeFocus].cardBg,
-                  }}
-                >
-                  {/* Left illustration */}
-                  <div className="w-full md:w-[30%] flex justify-center">
-                    <div className="relative w-[110px] h-[140px] sm:w-[140px] sm:h-[180px] md:w-[170px] md:h-[210px]">
-                      <Image
-                        src={FOCUS_SECTIONS[activeFocus].imageSrc}
-                        alt={FOCUS_SECTIONS[activeFocus].imageAlt}
-                        fill
-                        className="object-contain"
-                        loading="lazy"
-                        sizes="(max-width: 768px) 110px, 170px"
-                      />
+              {/* Content cards. All four are rendered and the inactive ones are
+                  hidden, rather than only the active one being mounted: the
+                  page is statically exported, so anything not in the initial
+                  render is not in the HTML. Before this, search engines saw the
+                  Therapy panel only — couples therapy, family therapy and
+                  medication were invisible to them. */}
+              {(Object.keys(FOCUS_SECTIONS) as FocusKey[]).map((key) => {
+                const section = FOCUS_SECTIONS[key];
+                const isActive = key === activeFocus;
+                return (
+                  <div
+                    key={key}
+                    role="tabpanel"
+                    id={`focus-panel-${key}`}
+                    aria-labelledby={`focus-tab-${key}`}
+                    hidden={!isActive}
+                    className={`${isActive ? "flex animate-fade-in" : "hidden"} flex-1 px-5 py-8 sm:px-10 sm:py-12 shadow-[0_24px_60px_rgba(0,0,0,0.06)] flex-col md:flex-row items-center gap-6 md:gap-12`}
+                    style={{ backgroundColor: section.cardBg }}
+                  >
+                    {/* Left illustration */}
+                    <div className="w-full md:w-[30%] flex justify-center">
+                      <div className="relative w-[110px] h-[140px] sm:w-[140px] sm:h-[180px] md:w-[170px] md:h-[210px]">
+                        <Image
+                          src={section.imageSrc}
+                          alt={section.imageAlt}
+                          fill
+                          className="object-contain"
+                          loading="lazy"
+                          sizes="(max-width: 768px) 110px, 170px"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Right text */}
-                  <div className="w-full md:w-[70%] text-left text-[#00373E] space-y-3 md:space-y-4">
-                    <h2
-                      className={bricolage.className}
-                      style={{
-                        color: "#E26B20",
-                        fontSize: "clamp(28px, 5vw, 48px)",
-                        fontWeight: 600,
-                        lineHeight: "normal",
-                        letterSpacing: "0.724px",
-                        maxWidth: "341px",
-                      }}
-                    >
-                      {FOCUS_SECTIONS[activeFocus].heading}
-                    </h2>
-                    <div style={{ maxWidth: "744px" }}>
-                      {FOCUS_SECTIONS[activeFocus].paragraphs.map((para) => (
-                        <p
-                          key={para}
-                          className={bricolage.className}
-                          style={{
-                            fontSize: "clamp(14px, 2.5vw, 24px)",
-                            fontWeight: 500,
-                            lineHeight: "normal",
-                            letterSpacing: "0.724px",
-                            color: "#00373E",
-                            marginBottom: "12px",
-                          }}
+                    {/* Right text */}
+                    <div className="w-full md:w-[70%] text-left text-[#00373E] space-y-3 md:space-y-4">
+                      <h2
+                        className={bricolage.className}
+                        style={{
+                          color: "#E26B20",
+                          fontSize: "clamp(28px, 5vw, 48px)",
+                          fontWeight: 600,
+                          lineHeight: "normal",
+                          letterSpacing: "0.724px",
+                          maxWidth: "341px",
+                        }}
+                      >
+                        {section.heading}
+                      </h2>
+                      <div style={{ maxWidth: "744px" }}>
+                        {section.paragraphs.map((para) => (
+                          <p
+                            key={para}
+                            className={bricolage.className}
+                            style={{
+                              fontSize: "clamp(14px, 2.5vw, 24px)",
+                              fontWeight: 500,
+                              lineHeight: "normal",
+                              letterSpacing: "0.724px",
+                              color: "#00373E",
+                              marginBottom: "12px",
+                            }}
+                          >
+                            {para}
+                          </p>
+                        ))}
+                      </div>
+                      <p
+                        className={bricolage.className}
+                        style={{
+                          fontSize: "clamp(14px, 2.5vw, 24px)",
+                          fontWeight: 700,
+                          lineHeight: "normal",
+                          letterSpacing: "0.724px",
+                          color: "#00373E",
+                        }}
+                      >
+                        {section.issues}
+                      </p>
+                      {section.more && (
+                        <a
+                          href={section.more.href}
+                          className={`${bricolage.className} inline-flex items-center gap-2 rounded-full bg-[#00373E] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#025a66] sm:text-base`}
                         >
-                          {para}
-                        </p>
-                      ))}
+                          {section.more.label}
+                          <span aria-hidden="true">→</span>
+                        </a>
+                      )}
                     </div>
-                    <p
-                      className={bricolage.className}
-                      style={{
-                        fontSize: "clamp(14px, 2.5vw, 24px)",
-                        fontWeight: 700,
-                        lineHeight: "normal",
-                        letterSpacing: "0.724px",
-                        color: "#00373E",
-                      }}
-                    >
-                      {FOCUS_SECTIONS[activeFocus].issues}
-                    </p>
                   </div>
-                </motion.div>
-              </AnimatePresence>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -609,17 +632,23 @@ export default function MentalHealthPage() {
                   )}
                 </div>
 
-                {/* Copy for active assessment */}
-                <div
-                  className={`${bricolage.className} mt-2 max-w-[1058px] text-base sm:text-lg lg:text-[24px] leading-relaxed text-[#5E5E5E] tracking-[0.724px] space-y-4`}
-                >
-                  <h3 className="text-xl sm:text-2xl lg:text-[40px] font-semibold tracking-[0.724px] text-[#E26B20]">
-                    {ASSESSMENTS[activeAssessment].label}
-                  </h3>
-                  {ASSESSMENTS[activeAssessment].paragraphs.map((p) => (
-                    <p key={`${activeAssessment}-${p}`}>{p}</p>
-                  ))}
-                </div>
+                {/* Copy for every assessment, inactive ones hidden — so ADHD
+                    testing, student mental health and queer affirmative care
+                    are all in the static HTML, not just whichever is open. */}
+                {(["adhd", "student", "queer"] as AssessmentKey[]).map((key) => (
+                  <div
+                    key={key}
+                    hidden={key !== activeAssessment}
+                    className={`${key === activeAssessment ? "block animate-fade-in" : "hidden"} ${bricolage.className} mt-2 max-w-[1058px] text-base sm:text-lg lg:text-[24px] leading-relaxed text-[#5E5E5E] tracking-[0.724px] space-y-4`}
+                  >
+                    <h3 className="text-xl sm:text-2xl lg:text-[40px] font-semibold tracking-[0.724px] text-[#E26B20]">
+                      {ASSESSMENTS[key].label}
+                    </h3>
+                    {ASSESSMENTS[key].paragraphs.map((p) => (
+                      <p key={`${key}-${p}`}>{p}</p>
+                    ))}
+                  </div>
+                ))}
               </div>
             </motion.div>
           </div>

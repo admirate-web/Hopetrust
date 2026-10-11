@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import WebVitals from '@/components/WebVitals';
 import LenisProvider from '@/components/LenisProvider';
@@ -17,13 +18,23 @@ const inter = Inter({
   fallback: ['system-ui', 'arial'],
 });
 
+/**
+ * The homepage title used to be the tagline alone ("A place for hope, healing,
+ * and renewal"), which says nothing about what Hope Trust is. It ranked at
+ * position ~1.4 for "mental health rehabilitation centres in hyderabad" and
+ * drew no clicks. The default now names the service and the city; the tagline
+ * stays on the page.
+ */
+const HOME_TITLE = 'Hope Trust | Mental Health & De-Addiction Centre in Hyderabad';
+const HOME_DESCRIPTION =
+  'Since 2002, Hope Trust in Banjara Hills, Hyderabad has offered therapy, psychiatry, couples counselling and de-addiction treatment, in person and online.';
+
 export const metadata: Metadata = {
   title: {
-    default: 'Hope Trust - A place for hope, healing, and renewal',
+    default: HOME_TITLE,
     template: '%s | Hope Trust',
   },
-  description:
-    'Hope Trust has been supporting individuals and families on their path to recovery for over 20 years. Our care is respectful, evidence-based, and always personal.',
+  description: HOME_DESCRIPTION,
   keywords:
     'mental health, therapy, counselling, recovery, addiction treatment, Hope Trust, Hyderabad, psychiatrist, psychologist, couples therapy, family therapy',
   authors: [{ name: 'Hope Trust' }],
@@ -37,9 +48,8 @@ export const metadata: Metadata = {
     apple: getLogoUrl(),
   },
   openGraph: {
-    title: 'Hope Trust - A place for hope, healing, and renewal',
-    description:
-      'Hope Trust has been supporting individuals and families on their path to recovery for over 20 years. Mental health and addiction recovery services in Hyderabad.',
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
     type: 'website',
     siteName: 'Hope Trust',
     locale: 'en_IN',
@@ -94,6 +104,26 @@ export default function RootLayout({
               to want to ask something. It brings the WhatsApp button with it. */}
           <ChatBubble />
         </LenisProvider>
+
+        {/* Google Analytics 4 (gtag.js). Production builds only, so local
+            development doesn't send visits to the live property. GA4's enhanced
+            measurement records the client-side navigations between pages, so
+            one tag in the root layout covers every route. The CSP in
+            public/_headers allows the Google hosts this needs. */}
+        {process.env.NODE_ENV === 'production' && siteConfig.gaMeasurementId && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${siteConfig.gaMeasurementId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${siteConfig.gaMeasurementId}');`}
+            </Script>
+          </>
+        )}
       </body>
     </html>
   );

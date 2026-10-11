@@ -5,7 +5,13 @@ import { ArrowLeft, Calendar, MapPin, Phone } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { serializeJsonLd } from '@/components/JsonLd';
-import { getDoctorsForBuild, getDoctorBySlug, bioIntro, type Doctor } from '@/lib/doctors';
+import {
+  getDoctorsForBuild,
+  getDoctorBySlug,
+  bioIntro,
+  practitionerRole,
+  type Doctor,
+} from '@/lib/doctors';
 import { toAuthor, personSchema } from '@/lib/authors';
 import { getPostsByAuthorSlug, getPostsReviewedBy } from '@/lib/blog';
 import { siteConfig } from '@/lib/config';
@@ -24,11 +30,17 @@ export async function generateMetadata({
   const doctor = await getDoctorBySlug(slug);
   if (!doctor) return { title: 'Therapist Not Found' };
 
-  const title = `${doctor.name} — ${doctor.qualification}`;
-  const description = bioIntro(
-    doctor.bio,
-    150
-  ) || `${doctor.name}, ${doctor.qualification}, ${doctor.department} at Hope Trust, Hyderabad.`;
+  // People search a practitioner by name, often with "psychologist" or the
+  // area attached ("dr vidya sagar psychologist", "rajeshwari luther"), so the
+  // title leads with the name and says what they are and where.
+  const role = practitionerRole(doctor);
+  const title = `${doctor.name}, ${role} in Hyderabad`;
+  const firstSentence = bioIntro(doctor.bio, 400).split(/(?<=\.)\s+/)[0] ?? '';
+  const lead =
+    firstSentence && firstSentence.length <= 115 ? firstSentence : bioIntro(doctor.bio, 110);
+  const description = lead
+    ? `${lead} Book at Hope Trust, Banjara Hills, Hyderabad, or online.`
+    : `${doctor.name}, ${role} at Hope Trust, Banjara Hills, Hyderabad. Book in person or online.`;
 
   return {
     title,
@@ -36,16 +48,16 @@ export async function generateMetadata({
     keywords: [
       doctor.name,
       doctor.qualification,
-      doctor.department,
-      `${doctor.department} Hyderabad`,
-      'therapist Hyderabad',
+      role,
+      `${role} Hyderabad`,
+      `${role} Banjara Hills`,
       'Hope Trust',
     ].join(', '),
     alternates: {
       canonical: `/therapists/${doctor.slug}/`,
     },
     openGraph: {
-      title,
+      title: `${title} | Hope Trust`,
       description,
       type: 'profile',
       url: `${siteConfig.url}/therapists/${doctor.slug}/`,
@@ -200,6 +212,7 @@ export default async function TherapistPage({
   if (!doctor) notFound();
 
   const byPhone = isPhoneBooking(doctor.bookingUrl);
+  const role = practitionerRole(doctor);
 
   const written = getPostsByAuthorSlug(doctor.slug);
   const reviewed = getPostsReviewedBy(doctor.slug);
@@ -258,7 +271,13 @@ export default async function TherapistPage({
                   {doctor.name}
                 </h1>
                 <p className="mt-2 text-sm font-medium text-[#ED7428] sm:text-base">
-                  {doctor.qualification}
+                  {role}
+                  {!doctor.qualification.toLowerCase().includes(role.toLowerCase()) && (
+                    <span className="text-gray-500"> · {doctor.qualification}</span>
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Hope Trust, Banjara Hills, Hyderabad · In person and online
                 </p>
                 <span className="mt-3 inline-block rounded-full bg-[#00373E]/10 px-3 py-1 text-xs font-medium text-[#00373E] sm:text-sm">
                   {doctor.department}

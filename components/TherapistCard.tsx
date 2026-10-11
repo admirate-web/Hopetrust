@@ -185,11 +185,13 @@ export default function TherapistCard({ doctor }: { doctor: Doctor }) {
             transform: 'rotateY(180deg)',
           }}
         >
-          {/* Teal header strip */}
+          {/* Teal header strip. The name is a paragraph here, not a heading:
+              the front face already carries the <h3>, and repeating it put
+              every practitioner into the page outline twice. */}
           <div className="shrink-0 bg-[#00373E] px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
-            <h3 className="text-base font-bold leading-tight text-white sm:text-lg lg:text-xl">
+            <p className="text-base font-bold leading-tight text-white sm:text-lg lg:text-xl">
               {doctor.name}
-            </h3>
+            </p>
             <p className="mt-1 text-xs font-medium text-[#ED7428] sm:text-sm">
               {doctor.qualification}
             </p>
