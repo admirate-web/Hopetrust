@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import JsonLd from '@/components/JsonLd';
 import { corporateFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'Corporate Wellness & Employee Mental Health',
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
       'Corporate wellness programmes to support employee mental health and reduce workplace stress.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

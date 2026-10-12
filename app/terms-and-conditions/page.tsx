@@ -1,6 +1,7 @@
 import Header from '@/components/Header';
 import dynamic from 'next/dynamic';
 import { Bricolage_Grotesque } from 'next/font/google';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 const Footer = dynamic(() => import('@/components/Footer'));
 
@@ -27,6 +28,7 @@ export const metadata = {
       'Terms and conditions of use for the Hope Trust website.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

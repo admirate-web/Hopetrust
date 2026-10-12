@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { mentalHealthFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'Therapy, Counselling & Psychiatry in Hyderabad',
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
     url: 'https://hopetrustindia.com/mental-health/',
     siteName: 'Hope Trust',
     locale: 'en_IN',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

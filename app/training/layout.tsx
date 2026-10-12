@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { trainingFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'Professional Development & Training Programs',
@@ -18,6 +19,7 @@ export const metadata: Metadata = {
       'Professional training programs in mental health and addiction counselling by Hope Trust.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

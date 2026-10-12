@@ -13,6 +13,7 @@ import Header from '@/components/Header';
 import BlogListClient from '@/components/BlogListClient';
 import { serializeJsonLd } from '@/components/JsonLd';
 import { siteConfig } from '@/lib/config';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export function generateStaticParams() {
   return getArchiveCategories().map((c) => ({ slug: c.slug }));
@@ -40,6 +41,7 @@ export async function generateMetadata({
       description: `Articles on ${category.name.toLowerCase()} from the Hope Trust team.`,
       type: 'website',
       siteName: 'Hope Trust',
+      images: [DEFAULT_SHARE_IMAGE],
     },
   };
 }
