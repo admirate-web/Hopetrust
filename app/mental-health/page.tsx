@@ -325,12 +325,16 @@ export default function MentalHealthPage() {
     <>
       <Header />
       <main className="min-h-screen bg-[#F7F6F4]">
-        {/* Hero section with background video */}
+        {/* Hero section with background video. The dark ground keeps the white
+            heading readable before the poster arrives. */}
         <section
           ref={heroRef}
-          className="relative h-screen w-full overflow-hidden"
+          className="relative h-screen w-full overflow-hidden bg-[#00373E]"
         >
-          {/* Background video — preload only metadata for faster initial paint */}
+          {/* Background video, served from this site so the CDN caches it. It
+              is a 720p cut of the original 4K clip with its index at the front
+              (1.8 MB, was 6 MB from Supabase storage with no edge caching), and
+              the poster is its own first frame, so the swap is seamless. */}
           <motion.video
             style={{ y: backgroundY, willChange: 'transform' }}
             autoPlay
@@ -338,10 +342,10 @@ export default function MentalHealthPage() {
             loop
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
-            preload="none"
-            poster={getAssetUrl('mental health therapy.png')}
+            preload="auto"
+            poster="/images/services/mental-health-hero-poster.webp"
           >
-            <source src={getAssetUrl("mentalhealthherovideo.mp4")} type="video/mp4" />
+            <source src="/videos/mental-health-hero.mp4" type="video/mp4" />
           </motion.video>
 
           {/* Dark overlay for readability */}
@@ -362,15 +366,22 @@ export default function MentalHealthPage() {
               </span>
             </h1>
 
+            {/* Two pairs, a line each on a phone and one line from sm up. The
+                browser used to break inside "Family Therapy" or "Couples
+                Therapy" and leave "Therapy" alone on a line. */}
             <div className="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl font-medium leading-tight">
               <p>
-                <span>Therapy</span>
-                <span className="mx-1.5 sm:mx-3 text-white/60">|</span>
-                <span>Medications</span>
-                <span className="mx-1.5 sm:mx-3 text-white/60">|</span>
-                <span>Couples Therapy</span>
-                <span className="mx-1.5 sm:mx-3 text-white/60">|</span>
-                <span>Family Therapy</span>
+                <span className="block sm:inline">
+                  <span>Therapy</span>
+                  <span className="mx-1.5 sm:mx-3 text-white/60">|</span>
+                  <span>Medications</span>
+                </span>
+                <span className="hidden sm:inline sm:mx-3 text-white/60">|</span>
+                <span className="mt-1 block sm:mt-0 sm:inline">
+                  <span className="whitespace-nowrap">Couples Therapy</span>
+                  <span className="mx-1.5 sm:mx-3 text-white/60">|</span>
+                  <span className="whitespace-nowrap">Family Therapy</span>
+                </span>
               </p>
               <p className="mt-2">&amp; more</p>
             </div>
