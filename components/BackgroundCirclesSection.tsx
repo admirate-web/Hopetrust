@@ -72,12 +72,17 @@ const BackgroundCirclesSection = () => {
               </div>
             </div>
 
-            <div
+            {/* The first paragraph on the page says what Hope Trust is. Google
+                builds its result snippet from page text when it prefers that to
+                the meta description, and before this the only sentences it could
+                use were patient testimonials about individual therapists. */}
+            <p
               className={`${bricolage.className} mt-4 sm:mt-6 text-[#00373E] text-base sm:text-lg md:text-2xl leading-relaxed sm:leading-9 font-bold max-w-[511px]`}
             >
-              Browse therapists, book a session, and start your healing journey
-              with trusted professionals.
-            </div>
+              Hope Trust is a mental health and de-addiction centre in Banjara
+              Hills, Hyderabad, offering therapy, psychiatry and addiction care
+              since 2002, in person and online.
+            </p>
 
             <button className="mt-10 inline-flex items-center justify-center rounded-full bg-[#00373E] px-8 sm:px-10 py-3 text-sm sm:text-base font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#ea6a0e] hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97]">
               Find A Therapist
