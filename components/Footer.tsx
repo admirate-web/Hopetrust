@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Bricolage_Grotesque } from "next/font/google";
 import { getAssetUrl } from "@/lib/assets";
-import { siteConfig } from "@/lib/config";
 
 const headingFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -174,26 +173,8 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Name, address, phone and hours, written the same way as the
-              structured data and the Google Business Profile. Consistent NAP
-              across the site is a local ranking signal; it also answers the
-              question most visitors scroll down for. */}
-          <address
-            className={`${headingFont.className} mt-10 not-italic text-sm leading-relaxed text-[#00373E]/80 sm:text-base`}
-          >
-            <span className="font-semibold text-[#00373E]">Hope Trust</span>,{" "}
-            {siteConfig.contact.address.full}{" "}
-            <a
-              href={`tel:${siteConfig.contact.phone.replace(/\s/g, "")}`}
-              className="whitespace-nowrap font-semibold text-[#00373E] hover:text-[#ED7428]"
-            >
-              {siteConfig.contact.phone}
-            </a>{" "}
-            · {siteConfig.hours.displayDays}, {siteConfig.hours.display}
-          </address>
-
           {/* Bottom row: buttons */}
-          <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8">
+          <div className="mt-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8">
             {/* NEWSLETTER DISABLED — uncomment when newsletter is enabled
             <Link
               href="/contact"

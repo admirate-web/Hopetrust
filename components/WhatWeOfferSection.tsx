@@ -20,19 +20,6 @@ const items = [
   { label: "Queer Affirmative Care", icon: getAssetUrl("asset5.png"), href: "/mental-health/" },
 ];
 
-/**
- * Text links to the specialty pages. The homepage is the most linked-to page
- * on the site, and a link from it is the quickest way for a new page to be
- * crawled and to inherit some of that standing.
- */
-const moreHelp = [
-  { label: "Couples & marriage counselling", href: "/couples-counselling/" },
-  { label: "Child & teen psychologists", href: "/child-psychologist/" },
-  { label: "OCD treatment", href: "/ocd-treatment/" },
-  { label: "Online therapy", href: "/online-therapy/" },
-  { label: "Psychologists in Hyderabad", href: "/book-your-session/" },
-];
-
 export default function WhatWeOfferSection() {
   const { elementRef, isVisible } = useScrollAnimation({
     threshold: 0.2,
@@ -83,21 +70,6 @@ export default function WhatWeOfferSection() {
             </a>
           ))}
         </div>
-
-        <nav aria-label="More ways we help" className="mt-4 w-full max-w-4xl">
-          <ul className="flex flex-wrap justify-center gap-2 sm:gap-3">
-            {moreHelp.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="inline-block rounded-full border border-[#00373E]/15 bg-white/70 px-4 py-2 text-sm font-medium text-[#00373E] transition-colors hover:border-[#ED7428] hover:text-[#ED7428]"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
 
         <p
           className={`${headingFont.className} mt-6 text-center text-base sm:text-lg md:text-xl text-[#00373E] font-semibold`}
