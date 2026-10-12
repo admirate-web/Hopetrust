@@ -4,20 +4,22 @@ import { mentalHealthFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
 
 export const metadata: Metadata = {
-  title: 'Mental Health Therapy & Psychiatry',
+  title: 'Therapy, Counselling & Psychiatry in Hyderabad',
   description:
-    'Therapy, psychiatry, couples and family therapy for anxiety, depression, trauma, ADHD, OCD and grief. In-clinic and online sessions in Hyderabad.',
+    'Therapy, psychiatry, couples and family therapy in Banjara Hills, Hyderabad, for anxiety, depression, trauma, ADHD, OCD and grief. In-clinic or online.',
   keywords:
     'mental health, therapy, psychiatry, couples therapy, family therapy, anxiety, depression, ADHD, OCD, trauma, counselling Hyderabad, Hope Trust',
   alternates: {
     canonical: '/mental-health/',
   },
   openGraph: {
-    title: 'Mental Health Services | Hope Trust',
+    title: 'Therapy, Counselling & Psychiatry in Hyderabad | Hope Trust',
     description:
       'Support for the mind, emotions, relationships, and everyday life. Therapy, medications, couples therapy, family therapy, and more.',
     type: 'website',
+    url: 'https://hopetrustindia.com/mental-health/',
     siteName: 'Hope Trust',
+    locale: 'en_IN',
   },
 };
 

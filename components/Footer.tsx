@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bricolage_Grotesque } from "next/font/google";
 import { getAssetUrl } from "@/lib/assets";
+import { siteConfig } from "@/lib/config";
 
 const headingFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -13,6 +14,22 @@ const navLinks = [
   { label: "Therapists", href: "/book-your-session" },
   { label: "Resources", href: "/blogs" },
   { label: "Contact", href: "/contact" },
+];
+
+/**
+ * Every service page, linked from every page. The specialty pages are new and
+ * otherwise reachable only from a few places; a site-wide link is what gets
+ * them crawled and passes them some of the site's standing.
+ */
+const serviceLinks = [
+  { label: "Mental Health", href: "/mental-health/" },
+  { label: "Addiction Treatment", href: "/addiction/" },
+  { label: "Couples Counselling", href: "/couples-counselling/" },
+  { label: "Child & Teen Psychologists", href: "/child-psychologist/" },
+  { label: "OCD Treatment", href: "/ocd-treatment/" },
+  { label: "Online Therapy", href: "/online-therapy/" },
+  { label: "Intervention Services", href: "/intervention-services/" },
+  { label: "Corporate Wellness", href: "/corporate-wellness/" },
 ];
 
 const socialLinks = [
@@ -39,7 +56,7 @@ export default function Footer() {
         <div className="relative rounded-[28px] sm:rounded-[40px] bg-white overflow-hidden px-8 sm:px-12 lg:px-16 py-10 sm:py-14">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-10 lg:gap-8">
             {/* Left side: logo + nav columns */}
-            <div className="flex flex-wrap items-start gap-6 sm:gap-12 lg:gap-16">
+            <div className="flex flex-wrap items-start gap-6 sm:gap-12 lg:gap-12">
               {/* Logo */}
               <div className="shrink-0">
                 <img
@@ -65,6 +82,25 @@ export default function Footer() {
                 ))}
               </nav>
 
+              {/* Nav column: Services */}
+              <nav className="flex flex-col gap-3" aria-label="Services">
+                <span className={`${headingFont.className} text-sm sm:text-base font-semibold text-[#00373E] mb-1`}>
+                  Services
+                </span>
+                {serviceLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`${headingFont.className} text-sm sm:text-base text-[#00373E] hover:text-[#ED7428] transition-colors`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Social and Legal share a column, so the row still fits beside
+                  the heading now that Services has been added. */}
+              <div className="flex flex-col gap-8">
               {/* Nav column 2: Social */}
               <nav className="flex flex-col gap-3">
                 <span className={`${headingFont.className} text-sm sm:text-base font-semibold text-[#00373E] mb-1`}>
@@ -98,6 +134,7 @@ export default function Footer() {
                   </Link>
                 ))}
               </nav>
+              </div>
             </div>
 
             {/* Right side: heading + decorative elements */}
@@ -137,8 +174,26 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* Name, address, phone and hours, written the same way as the
+              structured data and the Google Business Profile. Consistent NAP
+              across the site is a local ranking signal; it also answers the
+              question most visitors scroll down for. */}
+          <address
+            className={`${headingFont.className} mt-10 not-italic text-sm leading-relaxed text-[#00373E]/80 sm:text-base`}
+          >
+            <span className="font-semibold text-[#00373E]">Hope Trust</span>,{" "}
+            {siteConfig.contact.address.full}{" "}
+            <a
+              href={`tel:${siteConfig.contact.phone.replace(/\s/g, "")}`}
+              className="whitespace-nowrap font-semibold text-[#00373E] hover:text-[#ED7428]"
+            >
+              {siteConfig.contact.phone}
+            </a>{" "}
+            · {siteConfig.hours.displayDays}, {siteConfig.hours.display}
+          </address>
+
           {/* Bottom row: buttons */}
-          <div className="mt-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8">
+          <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8">
             {/* NEWSLETTER DISABLED — uncomment when newsletter is enabled
             <Link
               href="/contact"

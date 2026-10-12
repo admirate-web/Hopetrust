@@ -159,6 +159,327 @@
   from = "/blogs/category/mental-health/"
   to = "/mental-health/"
   status = 301
+# Legacy WordPress URLs that were still collecting search impressions while
+# returning 404. /about-us/know-your-therapists/ alone drew 2,600 impressions in
+# the 90 days to 2026-10-08, ranking on page one for "marriage counselling
+# hyderabad", "family counseling hyderabad" and "cbt hyderabad" — rankings that
+# vanish once Google drops the 404. Each goes to the page that now does that job.
+# Specific paths sit above their wildcard parents; first match wins.
+
+[[redirects]]
+  from = "/about-us/know-your-therapists/*"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/about-us/know-your-therapists"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/about-us/*"
+  to = "/about/"
+  status = 301
+
+[[redirects]]
+  from = "/about-us"
+  to = "/about/"
+  status = 301
+
+[[redirects]]
+  from = "/therapist-details/ms-akansha-kabra"
+  to = "/therapists/akansha-kabra/"
+  status = 301
+
+[[redirects]]
+  from = "/therapist-details/*"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/therapist-details"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/therapists/k-aparna"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/page/*"
+  to = "/blogs/"
+  status = 301
+
+[[redirects]]
+  from = "/dev/blog/how-will-a-drug-rehab-help-you"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/dev/blog/why-do-so-many-persons-from-overseas-seek-treatment-at-hope-trust-in-india-find-out"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/dev/blog/the-hope-outpatient-services-for-recovery-from-addiction-get-help-now"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/dev/blog/road-to-recovery-begins-with-hope"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/dev/*"
+  to = "/blogs/"
+  status = 301
+
+[[redirects]]
+  from = "/admission/*"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/admission"
+  to = "/addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/assessment/*"
+  to = "/mental-health/"
+  status = 301
+
+[[redirects]]
+  from = "/assessment"
+  to = "/mental-health/"
+  status = 301
+
+# Misspelt links to real posts. Search Console shows Google requesting these —
+# mostly from other sites and AI answers quoting a slug from memory. Sending
+# them to the post keeps whatever link value they carry instead of a 404.
+
+[[redirects]]
+  from = "/blogs/the-4-ds-to-help-prevent-relapse"
+  to = "/blogs/the-4-ds-to-help-you-prevent-relapse/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/most-commonly-used-drugs-in-the-world"
+  to = "/blogs/most-commonly-abused-drugs-in-the-world/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/most-commonly-absed-drugs-in-the-world"
+  to = "/blogs/most-commonly-abused-drugs-in-the-world/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-no-matter-how-rich-you-are"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy-no-matter-how-rich-year"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-bound-no-matter-how-rich-you-are"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy-no-matter-how-rich-yours-are"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are-"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/15-things-money-cant-buy-no-matter-how-rich-year-are"
+  to = "/blogs/15-things-money-cant-buy-no-matter-how-rich-you-are/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/grandiosity-the-hallmark-of-addicts-and-addicts"
+  to = "/blogs/grandiosity-the-hallmark-of-alcoholics-and-addicts/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/8-psychology-facts-our-dark-side"
+  to = "/blogs/8-psychology-facts-about-our-dark-side/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/8-psychology-dark-side"
+  to = "/blogs/8-psychology-facts-about-our-dark-side/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/when-your-heart-stirs-for-another-navigating-the-uncharted-waters-of-married-attraction"
+  to = "/blogs/when-your-heart-stirs-for-anothernavigating-the-uncharted-waters-of-married-attraction/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/what-to-do-if-you-think-v-may-have-an-internet-addiction"
+  to = "/blogs/what-to-do-if-you-think-you-may-have-an-internet-addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/what-effect-does-alcoholism-have-on-family"
+  to = "/blogs/what-effect-does-alcoholism-have-on-your-family/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/what-challenges-do-teens-face-today"
+  to = "/blogs/what-challenges-do-teenagers-face-today/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/top-10-for-divorce"
+  to = "/blogs/top-10-reasons-for-divorce/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/the-serenity-prayer-how-id-is-used-in-a-rehab"
+  to = "/blogs/the-serenity-prayer-how-it-is-used-in-a-rehab/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/the-art-of-detachment-how-to-care-for-others-without-yourselves"
+  to = "/blogs/the-art-of-detachment-how-to-care-for-others-without-losing-yourself/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/the-art-of-detachment-how-to-care-for-others-without-lossing-yourself"
+  to = "/blogs/the-art-of-detachment-how-to-care-for-others-without-losing-yourself/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/surrender-to-win-the-liberating-paradox-at-all-growth"
+  to = "/blogs/surrender-to-win-the-liberating-paradox-at-the-heart-of-all-growth/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/should-you-tell-your-friends-about-having-depression"
+  to = "/blogs/should-you-tell-your-friends-about-your-depression/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/how-couples-can-rebuild-trust-in-your-relationship"
+  to = "/blogs/how-couples-can-rebuild-trust-in-their-relationship/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/hopetrustindia/what-happens-in-a-rehab"
+  to = "/blogs/what-happens-in-a-rehab/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/forget-the-butterflies-why-real-love-feels-coming-home"
+  to = "/blogs/forget-the-butterflies-why-real-love-feels-like-coming-home/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/alcoholism-and-malnutrition-what-are-consequences"
+  to = "/blogs/alcoholism-and-malnutrition-what-are-the-consequences/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/9-interesting-traits-of-people-who-rarely-post-on-social-media"
+  to = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media-"
+  to = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/9-interesting-traits-of-people-when-never-post-on-social-media"
+  to = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/9-interesting-traits-of-never-post-on-social-media"
+  to = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/9-distinct-traits-of-people-who-never-post-on-social-media"
+  to = "/blogs/9-interesting-traits-of-people-who-never-post-on-social-media/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/8-ways-to-deepen-love-according-experts"
+  to = "/blogs/8-ways-to-deepen-love-according-to-experts/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-isn-t-genuinely-good-despite-their-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-is-isnt-genuinely-good-despite-their-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-someone-is-genuinely-good-despite-their-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-that-one-isnt-genuinely-good-despite-their-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-someone-isnt-genuinely-good-despite-their-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/7-signs-someone-isnt-genuinely-good-despite-outward-appearance"
+  to = "/blogs/7-signs-that-someone-isnt-genuinely-good-despite-their-outward-appearance/"
+  status = 301
+
+[[redirects]]
+  from = "/blogs/30-questions-to-get-someone-talking-more-than-how-@are-you"
+  to = "/blogs/30-questions-to-get-someone-talking-more-than-how-are-you/"
+  status = 301
+
 # Redirect old WordPress blog URLs (/blog/slug/) to new format (/blogs/slug/)
 [[redirects]]
   from = "/blog/:slug"

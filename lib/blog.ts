@@ -20,6 +20,20 @@ export interface BlogPost {
   reviewedBy?: string;
   /** ISO date the medical review happened. Required alongside `reviewedBy`. */
   reviewedOn?: string;
+  /**
+   * Title for the search result, when it should differ from the on-page
+   * headline — usually to use the words people actually search with. Used
+   * as-is, without the " | Hope Trust" suffix, so keep it under ~60 characters.
+   */
+  seoTitle?: string;
+  /** Meta description, when the excerpt is not a good search snippet. */
+  seoDescription?: string;
+  /**
+   * A two-to-four sentence direct answer to the question the post is about,
+   * shown above the article. Written answer-first so it can be quoted on its
+   * own — by a featured snippet, or by an AI answer citing the post.
+   */
+  summary?: string;
   wpLink: string;
   content: string;
   readingTime: string;
@@ -69,7 +83,7 @@ function parseMdxFile(filePath: string): BlogPost | null {
       slug: data.slug || path.basename(filePath, '.mdx'),
       title: data.title || 'Untitled',
       date: data.date || '',
-      modified: data.modified || data.date || '',
+      modified: data.modified ? toIsoDate(data.modified) : data.date || '',
       excerpt: data.excerpt || '',
       categories: data.categories || [],
       tags: data.tags || [],
@@ -81,6 +95,9 @@ function parseMdxFile(filePath: string): BlogPost | null {
       reviewedBy: data.reviewedBy && data.reviewedOn ? data.reviewedBy : undefined,
       reviewedOn:
         data.reviewedBy && data.reviewedOn ? toIsoDate(data.reviewedOn) : undefined,
+      seoTitle: data.seoTitle || undefined,
+      seoDescription: data.seoDescription || undefined,
+      summary: data.summary ? String(data.summary).replace(/\s+/g, ' ').trim() : undefined,
       wpLink: data.wpLink || '',
       content,
       readingTime: stats.text,
@@ -117,7 +134,9 @@ export function getAllPosts(): BlogPost[] {
 export function getAllPostsMeta(): BlogPostMeta[] {
   if (postsMetaCache) return postsMetaCache;
   postsMetaCache = getAllPosts().map(
-    ({ content, readingTime, wpLink, ...meta }) => meta
+    // Listing pages never show the search-result fields or the summary, so
+    // they stay out of the metadata the archive routes pass around.
+    ({ content, readingTime, wpLink, seoTitle, seoDescription, summary, ...meta }) => meta
   );
   return postsMetaCache;
 }

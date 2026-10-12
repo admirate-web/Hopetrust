@@ -79,6 +79,30 @@ const FALLBACK_PROGRAMS: Omit<AddictionProgram, 'id' | 'is_active' | 'created_at
   },
 ];
 
+/** Drawn from the programme features below; keep the two in step. */
+const DEADDICTION_STEPS = [
+  {
+    title: 'Assessment',
+    body: 'A first conversation about what has been happening, with assessments where needed, so the plan fits the person rather than the other way round.',
+  },
+  {
+    title: 'Counselling and step work',
+    body: 'Regular sessions with an addiction counsellor, including essential step work with a primary counsellor, drawing on Twelve Step principles alongside other counselling methods.',
+  },
+  {
+    title: 'Family sessions',
+    body: 'Addiction affects the whole family, so family sessions are built into the recovery programmes.',
+  },
+  {
+    title: 'Psychiatric care',
+    body: 'Consultations with a psychiatrist cover medication and any mental health condition alongside the addiction — a dual diagnosis is treated together, not one after the other.',
+  },
+  {
+    title: 'Relapse prevention and after-care',
+    body: 'Relapse prevention strategies are tailored to the individual, and the after-care programme continues support through the early months of recovery.',
+  },
+];
+
 const fadeFrom = (direction: 'left' | 'right' | 'up', delay = 0) => ({
   initial: {
     opacity: 0,
@@ -145,7 +169,11 @@ export default function AddictionPage() {
             className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 sm:px-6 lg:px-8 text-center text-white"
           >
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-semibold tracking-[0.18em] uppercase">
-              Specialised Addiction Services
+              Addiction Treatment{' '}
+              <span className="mx-auto mt-5 block max-w-3xl text-base font-medium normal-case tracking-normal sm:text-lg md:text-xl lg:text-2xl">
+                Outpatient and online de-addiction for alcohol, drugs, nicotine and behavioural
+                addictions in Hyderabad
+              </span>
             </h1>
           </motion.div>
         </section>
@@ -157,9 +185,12 @@ export default function AddictionPage() {
             <FadeInSection>
               <div className="w-full max-w-[1240px] min-h-[235px] rounded-[32px] sm:rounded-[59px] bg-white px-6 sm:px-12 lg:px-[100px] py-8 sm:py-10 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
                 <p className="text-center text-base sm:text-lg lg:text-xl font-medium leading-relaxed text-[#1a1a1a]">
-                  Hope Trust&apos;s outpatient/online{' '}
+                  Since 2002, Hope Trust has offered{' '}
                   <span className="underline underline-offset-4 decoration-[#ED7428]">addiction treatment</span>{' '}
-                  programs offer you an individualised recovery plan. Clients receive psychological and social support with assessments and continuing care recommendations.
+                  in Hyderabad that fits around work and family life. Our outpatient and online
+                  de-addiction programmes begin with an assessment and build an individual recovery
+                  plan — counselling, family sessions, consultations with a psychiatrist and relapse
+                  prevention — with continuing care once the programme ends.
                 </p>
               </div>
             </FadeInSection>
@@ -195,14 +226,23 @@ export default function AddictionPage() {
                 />
               </motion.div>
               <motion.div {...fadeFrom('right', 0.15)} className="flex-1">
-                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
                   Alcohol Addiction
-                </h3>
+                </h2>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
-                  Addiction is a disease, not a moral failing. Recovery and sobriety is not about willpower. It can be achieved through medical assistance and structured treatment plans. Our team of trained and licensed professionals help you in choosing the best treatment approach and support you on your journey.
+                  Addiction is a disease, not a moral failing, and recovery from alcohol dependence is
+                  not a matter of willpower. It comes through structured treatment and steady support.
                 </p>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
-                  We offer different treatment packages, designed to fit your needs. List different addiction packages with their costs.
+                  Our alcohol de-addiction programme combines regular sessions with an addiction
+                  counsellor, step work, family sessions and consultations with a psychiatrist,
+                  including whether medication may help. Relapse prevention is planned around your
+                  own triggers, and after-care continues once the programme ends. Programme details
+                  and costs are listed below.
+                </p>
+                <p className="mt-4 text-sm sm:text-base font-medium leading-relaxed text-gray-600">
+                  Stopping heavy drinking suddenly can be dangerous. If you drink heavily every day,
+                  speak to a doctor before you stop — withdrawal may need medical supervision.
                 </p>
               </motion.div>
             </div>
@@ -219,14 +259,23 @@ export default function AddictionPage() {
                 />
               </motion.div>
               <motion.div {...fadeFrom('left', 0.15)} className="flex-1">
-                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
                   Nicotine and Drug Addiction
-                </h3>
+                </h2>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
-                  Addiction is a disease, not a moral failing. Recovery and sobriety is not about willpower. It can be achieved through medical assistance and structured treatment plans. Our team of trained and licensed professionals help you in choosing the best treatment approach and support you on your journey.
+                  Drug and nicotine dependence change how the brain responds to reward and stress,
+                  which is why stopping takes more than deciding to. Our trained and licensed team
+                  helps you choose the right treatment approach and supports you through it.
                 </p>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
-                  What we can help with - Smoking, Vaping, Marijuana, Hard Drugs
+                  The Nicotine Cessation Program runs over 10 days, with four counselling sessions
+                  and a psychiatrist consultation at which nicotine replacement therapy may be
+                  suggested. Drug dependence is treated through the 30 Days Recovery Program, with
+                  family sessions and relapse prevention.
+                </p>
+                <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
+                  What we can help with: smoking, vaping and all tobacco products; marijuana
+                  (ganja); and hard drugs.
                 </p>
               </motion.div>
             </div>
@@ -243,18 +292,73 @@ export default function AddictionPage() {
                 />
               </motion.div>
               <motion.div {...fadeFrom('right', 0.15)} className="flex-1">
-                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
                   Behavioural Addiction
-                </h3>
+                </h2>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
                   The mind and body can get addicted to harmful yet gratifying behaviours as well. Behavioural addictions impact the mind, body and emotions. The therapist not only helps you understand the root causes but also psychoeducates and plans customised treatments to help you recover.
                 </p>
                 <p className="mt-4 text-sm sm:text-base lg:text-lg font-medium leading-relaxed text-[#1a1a1a]">
-                  What we can help with - Gaming, Internet/Screen time, Gambling, Pornography, Sex Addiction
+                  What we can help with: gaming, internet and screen time, gambling, pornography and
+                  sex addiction.
                 </p>
               </motion.div>
             </div>
 
+          </div>
+        </section>
+
+        {/* How the programmes run, and who they suit. Every step is a feature
+            listed on the programme cards below, described in prose so the
+            page answers "how does outpatient de-addiction work" on its own. */}
+        <section className="w-full bg-[#F7F6F4] px-4 sm:px-8 lg:px-12 pb-16 sm:pb-24">
+          <div className="mx-auto max-w-[1240px] grid gap-8 lg:grid-cols-5">
+            <div className="rounded-[28px] bg-white p-6 sm:p-10 lg:col-span-3">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#00373E]">
+                How outpatient de-addiction works
+              </h2>
+              <ol className="mt-6 space-y-5">
+                {DEADDICTION_STEPS.map((step, i) => (
+                  <li key={step.title} className="flex gap-4">
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ED7428] text-sm font-semibold text-white"
+                      aria-hidden="true"
+                    >
+                      {i + 1}
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#00373E]">{step.title}</h3>
+                      <p className="mt-1 text-sm sm:text-base leading-relaxed text-[#1a1a1a]">
+                        {step.body}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="rounded-[28px] bg-[#00373E] p-6 sm:p-10 text-white lg:col-span-2">
+              <h2 className="text-2xl sm:text-3xl font-semibold">
+                Outpatient treatment or residential rehab?
+              </h2>
+              <p className="mt-4 text-sm sm:text-base leading-relaxed text-white/85">
+                Outpatient treatment lets you recover while living at home and keeping up work or
+                study, and it brings the family into the process. It suits many people, but not
+                everyone.
+              </p>
+              <p className="mt-4 text-sm sm:text-base leading-relaxed text-white/85">
+                If the assessment suggests you need medically supervised detox or a residential
+                programme first, we will tell you so. And if you are coming home after an inpatient
+                programme elsewhere, the 30 Days Extended OP / After Care Program is designed for
+                exactly that stage.
+              </p>
+              <a
+                href="/intervention-services/"
+                className="mt-6 inline-flex items-center justify-center rounded-full bg-[#ED7428] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#d4651f] sm:text-base"
+              >
+                Helping someone who refuses treatment
+              </a>
+            </div>
           </div>
         </section>
 

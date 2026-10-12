@@ -3,21 +3,30 @@ import JsonLd from '@/components/JsonLd';
 import { addictionFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
 
+/**
+ * Search Console had this page at positions 35–70 for the searches it exists
+ * for — "alcohol addiction treatment hyderabad", "drug addiction treatment in
+ * hyderabad", "alcohol de addiction treatment" — while a 2018 blog post
+ * outranked it. The title now uses the words people search with, including
+ * "de-addiction", the term most Indian searchers use.
+ */
 export const metadata: Metadata = {
-  title: 'Addiction Recovery Services in Hyderabad',
+  title: 'Alcohol & Drug De-Addiction Treatment in Hyderabad',
   description:
-    'Specialised outpatient and online addiction treatment in Hyderabad. Individualised recovery plans for alcohol, drug, nicotine and behavioural addiction.',
+    'Outpatient and online de-addiction treatment in Hyderabad for alcohol, drugs, nicotine and gambling, with counselling, family sessions and psychiatric care.',
   keywords:
-    'addiction recovery, alcohol addiction, drug addiction, nicotine cessation, behavioural addiction, gambling addiction, internet addiction, rehab Hyderabad, Hope Trust',
+    'de-addiction centre Hyderabad, alcohol de-addiction treatment, drug addiction treatment Hyderabad, rehab Hyderabad, nicotine cessation, gambling addiction treatment, Hope Trust',
   alternates: {
     canonical: '/addiction/',
   },
   openGraph: {
-    title: 'Addiction Recovery Services | Hope Trust',
+    title: 'Alcohol & Drug De-Addiction Treatment in Hyderabad | Hope Trust',
     description:
-      'Individualised recovery plans for alcohol, drug, nicotine, and behavioural addictions. Outpatient and online treatment available.',
+      'Outpatient and online de-addiction programmes for alcohol, drugs, nicotine and behavioural addictions, with family sessions and psychiatric care.',
     type: 'website',
+    url: 'https://hopetrustindia.com/addiction/',
     siteName: 'Hope Trust',
+    locale: 'en_IN',
   },
 };
 
@@ -29,8 +38,8 @@ export default function AddictionLayout({
   return (
     <>
       <JsonLd data={getServiceSchema({
-        name: 'Addiction Recovery Services',
-        description: 'Specialised outpatient and online addiction treatment programs for alcohol, drug, nicotine, and behavioural addictions in Hyderabad.',
+        name: 'Alcohol & Drug De-Addiction Treatment',
+        description: 'Outpatient and online de-addiction programmes in Hyderabad for alcohol, drug, nicotine and behavioural addictions, with counselling, family sessions, psychiatric consultations and after-care.',
         url: 'https://hopetrustindia.com/addiction/',
         serviceType: 'Addiction Treatment',
       })} />

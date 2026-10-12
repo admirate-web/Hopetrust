@@ -7,6 +7,9 @@ export const siteConfig = {
   name: 'Hope Trust India',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://hopetrustindia.com',
 
+  /** Google Analytics 4 measurement ID. Loaded site-wide from app/layout.tsx. */
+  gaMeasurementId: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-43BKV700YB',
+
   contact: {
     email: 'frontoffice@hopetrustindia.com',
     trainingEmail: 'training@hopetrustindia.com',

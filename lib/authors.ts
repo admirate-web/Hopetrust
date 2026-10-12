@@ -1,5 +1,6 @@
 import type { Doctor } from '@/lib/doctors';
 import { siteConfig } from '@/lib/config';
+import { bioLanguages, bioSection, practitionerRole } from '@/lib/bio';
 
 /**
  * Loaded on demand. `lib/doctors` constructs the Supabase client at module
@@ -33,6 +34,12 @@ export type Author = {
   /** Highest qualification, e.g. "MD Psychiatry", "MPhil Clinical Psychology". */
   credential: string;
   department: string;
+  /** Professional title, e.g. "Clinical Psychologist". See `practitionerRole`. */
+  role: string;
+  /** The "Areas of Expertise" bullets from their bio. */
+  expertise: string[];
+  /** Languages they hold sessions in, from their bio. */
+  languages: string[];
   url: string;
   /** Stable schema.org node identifier for this person. */
   id: string;
@@ -62,6 +69,9 @@ export function toAuthor(doctor: Doctor): Author {
     name: doctor.name,
     credential: doctor.qualification,
     department: doctor.department,
+    role: practitionerRole(doctor),
+    expertise: bioSection(doctor.bio, /expertise/i),
+    languages: bioLanguages(doctor.bio),
     url: `${siteConfig.url}/therapists/${doctor.slug}/`,
     id: personId(doctor.slug),
     photo: doctor.photo,
@@ -133,9 +143,13 @@ export function personSchema(author: Author, opts: { description?: string; booki
     url: author.url,
     name: author.name,
     ...(opts.description && { description: opts.description }),
-    jobTitle: author.department === 'Psychiatry' ? 'Psychiatrist' : author.department,
+    jobTitle: author.role,
     hasCredential: credentialSchema(author.credential),
-    knowsAbout: author.department,
+    // The practitioner's own expertise list is what lets an answer engine match
+    // "OCD specialist in Hyderabad" to a named clinician; the department alone
+    // ("Psychology") says nothing it can match on.
+    knowsAbout: author.expertise.length > 0 ? author.expertise : author.department,
+    ...(author.languages.length > 0 && { knowsLanguage: author.languages }),
     worksFor: { '@id': `${siteConfig.url}/#organization` },
     affiliation: { '@id': `${siteConfig.url}/#organization` },
     ...(author.photo && { image: author.photo }),

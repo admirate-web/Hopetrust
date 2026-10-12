@@ -80,28 +80,36 @@ const HeroSection = () => {
 
             {/* Content overlay */}
             <div className="relative flex min-h-full flex-col items-center justify-center px-5 sm:px-10 lg:px-20 py-10 sm:py-14 gap-4 sm:gap-6 text-center text-white">
-              {/* Heading */}
+              {/* The page's one <h1> says what Hope Trust is and where; the
+                  tagline below it keeps the large type but is a paragraph. A
+                  heading of "A place for hope, healing, and renewal" told search
+                  engines nothing about the service. */}
               <h1
-                className={`${heroFont.className} font-semibold text-center 
+                className={`${heroFont.className} fade-in-optimized text-[12px] sm:text-[14px] lg:text-[15px] font-semibold uppercase tracking-[0.16em] text-[#FFFAD4]`}
+              >
+                Mental health &amp; de-addiction centre · Hyderabad
+              </h1>
+
+              <p
+                className={`${heroFont.className} font-semibold text-center
     text-[28px] sm:text-[36px] lg:text-[48px] leading-snug sm:leading-normal fade-in-optimized text-white`}
                 style={{ letterSpacing: '0.724px' }}
               >
                 A place for <span className="text-[#EE7329]">hope</span>,{' '}
                 <br className="hidden sm:block" />
                 healing, and renewal.
-              </h1>
+              </p>
 
               {/* Subtext */}
               <p
-                className={`${heroFont.className} fade-in-optimized 
-    text-[16px] sm:text-[20px] lg:text-[24px] leading-relaxed sm:leading-normal 
-    font-bold 
-    text-[#FFFAD4] 
+                className={`${heroFont.className} fade-in-optimized
+    text-[16px] sm:text-[20px] lg:text-[24px] leading-relaxed sm:leading-normal
+    font-bold
+    text-[#FFFAD4]
     w-full max-w-[338px]`}
                 style={{ letterSpacing: '0.724px' }}
               >
-               We&apos;re here if you need us message us
-                anytime.
+                We&apos;re here if you need us. Message us anytime.
               </p>
 
               {/* Button */}

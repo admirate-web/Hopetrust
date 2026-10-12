@@ -2,19 +2,24 @@ import { describe, it, expect } from 'vitest';
 import {
   addictionFaqs,
   mentalHealthFaqs,
+  bookingFaqs,
   interventionFaqs,
   corporateFaqs,
   trainingFaqs,
   type Faq,
 } from '@/lib/faqs';
 import { getFAQSchema } from '@/lib/jsonld';
+import { SPECIALTIES } from '@/lib/specialties';
+import { siteConfig } from '@/lib/config';
 
 const SETS: [string, Faq[]][] = [
   ['addiction', addictionFaqs],
   ['mental health', mentalHealthFaqs],
+  ['booking', bookingFaqs],
   ['intervention', interventionFaqs],
   ['corporate wellness', corporateFaqs],
   ['training', trainingFaqs],
+  ...SPECIALTIES.map((s): [string, Faq[]] => [s.slug, s.faqs]),
 ];
 
 describe.each(SETS)('%s FAQs', (_name, faqs) => {
@@ -61,6 +66,18 @@ describe('FAQ schema', () => {
       expect(entry['@type']).toBe('Question');
       expect(entry.acceptedAnswer['@type']).toBe('Answer');
     }
+  });
+});
+
+describe('contact details in answers', () => {
+  it('quote the phone number and hours lib/config.ts publishes', () => {
+    // Answers are prose, so they cannot read the config — this is what stops
+    // them drifting from the number and hours shown everywhere else.
+    const all = SETS.flatMap(([, faqs]) => faqs).map((f) => f.answer).join('\n');
+    for (const phone of all.match(/\+91 \d{10}/g) ?? []) {
+      expect([siteConfig.contact.phone, siteConfig.contact.phone2]).toContain(phone);
+    }
+    expect(all).not.toMatch(/9 ?AM|8 ?PM|18:00|09:00/);
   });
 });
 

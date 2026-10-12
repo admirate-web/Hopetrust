@@ -22,7 +22,19 @@ type NavItem = {
 
 const leftNavItems: NavItem[] = [
   { label: 'About Us', href: '/about', hasDropdown: false },
-  { label: 'Mental Health', href: '/mental-health', hasDropdown: false },
+  {
+    label: 'Mental Health',
+    href: '/mental-health',
+    hasDropdown: true,
+    // The desktop dropdown is always in the DOM, so these are crawlable links
+    // to the specialty pages from every page on the site.
+    children: [
+      { label: 'Couples & Marriage Counselling', href: '/couples-counselling/' },
+      { label: 'Child & Teen Psychologists', href: '/child-psychologist/' },
+      { label: 'OCD Treatment', href: '/ocd-treatment/' },
+      { label: 'Online Therapy', href: '/online-therapy/' },
+    ],
+  },
   {
     label: 'Addiction Services',
     href: '/addiction',

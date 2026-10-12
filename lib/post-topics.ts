@@ -120,6 +120,64 @@ export const TOPICS: Topic[] = [
     cta: 'View training programmes',
     match: ['training', 'certification', 'internship', 'become a counsellor', 'become a therapist'],
   },
+  // The specialty topics sit after addiction and work, so "addiction and
+  // relationships" still goes to addiction and "burnout at work" to corporate,
+  // and before the catch-all, so a relationship post reaches the couples page
+  // rather than the general one. Online comes first among them: a post about
+  // online therapy is about the format whatever the concern.
+  {
+    id: 'online',
+    heading: 'Prefer to talk online?',
+    blurb:
+      'Every Hope Trust practitioner sees clients online over a private video link, as well as in person in Hyderabad.',
+    href: '/online-therapy/',
+    cta: 'How online therapy works',
+    match: ['online', 'teletherapy', 'tele-therapy', 'virtual therapy', 'video call'],
+  },
+  {
+    id: 'couples',
+    heading: 'Working through this as a couple',
+    blurb:
+      'Hope Trust offers couples and marriage counselling in Hyderabad and online, for communication, conflict, trust and family pressure.',
+    href: '/couples-counselling/',
+    cta: 'Explore couples counselling',
+    match: [
+      'couple',
+      'marriage',
+      'marital',
+      'married',
+      'divorce',
+      'spouse',
+      'partner',
+      'relationship',
+      'infidelity',
+      'betrayal',
+      'love',
+      'dating',
+      'breakup',
+      'break-up',
+      'heartbreak',
+      'intimacy',
+    ],
+  },
+  {
+    id: 'child',
+    heading: 'Support for children and teenagers',
+    blurb:
+      'Hope Trust’s psychologists work with children, teenagers and students, and their parents — including ADHD testing and exam stress.',
+    href: '/child-psychologist/',
+    cta: 'See child & teen psychology',
+    match: ['child', 'teen', 'adolescen', 'parenting', 'kids', 'student', 'exam', 'adhd'],
+  },
+  {
+    id: 'ocd',
+    heading: 'Help with OCD',
+    blurb:
+      'Hope Trust treats OCD with CBT and exposure and response prevention (ERP), alongside psychiatric care where it helps.',
+    href: '/ocd-treatment/',
+    cta: 'Read about OCD treatment',
+    match: ['ocd', 'obsessive', 'intrusive thought'],
+  },
   {
     id: 'mental-health',
     heading: 'Talk to someone about this',
