@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { getBreadcrumbSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'About Us — Our Story, Team & Approach',
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
       'From one family\'s journey to a global network of care — Hope Trust stands for recovery, healing, and rebuilding meaningful lives.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

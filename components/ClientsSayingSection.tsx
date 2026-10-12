@@ -233,7 +233,10 @@ export default function ClientsSayingSection() {
   };
 
   return (
-    <section className="w-full bg-white py-16 sm:py-20">
+    // data-nosnippet: the testimonials stay on the page, but Google may not
+    // quote them as the snippet under a search result. It did — "Rajeshwari has
+    // been an invaluable support…" was the text under the homepage result.
+    <section data-nosnippet className="w-full bg-white py-16 sm:py-20">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 sm:px-6 lg:flex-row lg:items-stretch lg:gap-16">
         {/* Left column: heading (with typing animation) and description */}
         <div

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { getBreadcrumbSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'Contact Us & Book an Appointment',
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
       'Reach out for in-clinic or online appointments. Office hours 10 AM to 7 PM, Monday to Saturday. Banjara Hills, Hyderabad.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

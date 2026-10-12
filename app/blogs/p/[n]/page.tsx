@@ -10,6 +10,7 @@ import Header from '@/components/Header';
 import BlogListClient from '@/components/BlogListClient';
 import { serializeJsonLd } from '@/components/JsonLd';
 import { siteConfig } from '@/lib/config';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 /**
  * Pages 2..N of the blog archive. Page 1 lives at /blogs/ so there is no
@@ -43,6 +44,7 @@ export async function generateMetadata({
         'Explore articles on mental health, therapy, addiction recovery, relationships, and wellness.',
       type: 'website',
       siteName: 'Hope Trust',
+      images: [DEFAULT_SHARE_IMAGE],
     },
   };
 }

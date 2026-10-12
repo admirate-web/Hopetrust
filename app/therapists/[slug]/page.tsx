@@ -15,6 +15,7 @@ import {
 import { toAuthor, personSchema } from '@/lib/authors';
 import { getPostsByAuthorSlug, getPostsReviewedBy } from '@/lib/blog';
 import { siteConfig } from '@/lib/config';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export async function generateStaticParams() {
   const doctors = await getDoctorsForBuild();
@@ -62,7 +63,9 @@ export async function generateMetadata({
       type: 'profile',
       url: `${siteConfig.url}/therapists/${doctor.slug}/`,
       siteName: 'Hope Trust',
-      images: doctor.photo ? [{ url: doctor.photo, alt: doctor.name }] : [],
+      images: doctor.photo
+        ? [{ url: doctor.photo, alt: doctor.name }]
+        : [DEFAULT_SHARE_IMAGE],
     },
   };
 }

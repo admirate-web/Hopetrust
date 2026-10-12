@@ -8,6 +8,7 @@ import Header from '@/components/Header';
 import BlogListClient from '@/components/BlogListClient';
 import { serializeJsonLd } from '@/components/JsonLd';
 import { siteConfig } from '@/lib/config';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata = {
   title: 'Mental Health & Wellness Insights',
@@ -24,6 +25,7 @@ export const metadata = {
       'Explore articles on mental health, therapy, addiction recovery, relationships, and wellness.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

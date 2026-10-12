@@ -5,7 +5,7 @@ import { Inter } from 'next/font/google';
 import WebVitals from '@/components/WebVitals';
 import LenisProvider from '@/components/LenisProvider';
 import { Toaster } from 'sonner';
-import { getLogoUrl } from '@/lib/assets';
+import { DEFAULT_SHARE_IMAGE, SITE_ICONS } from '@/lib/share-images';
 import ChatBubble from '@/components/ChatBubble';
 import JsonLd from '@/components/JsonLd';
 import { getOrganizationSchema, getWebSiteSchema } from '@/lib/jsonld';
@@ -43,10 +43,7 @@ export const metadata: Metadata = {
   // NOTE: do not set `alternates` here. In the App Router every route inherits
   // it unless it overrides it, which would silently canonicalise all blog posts
   // and policy pages to `/`. Each route declares its own canonical instead.
-  icons: {
-    icon: getLogoUrl(),
-    apple: getLogoUrl(),
-  },
+  icons: SITE_ICONS,
   openGraph: {
     title: HOME_TITLE,
     description: HOME_DESCRIPTION,
@@ -54,14 +51,7 @@ export const metadata: Metadata = {
     siteName: 'Hope Trust',
     locale: 'en_IN',
     url: siteConfig.url,
-    images: [
-      {
-        url: getLogoUrl(),
-        width: 512,
-        height: 512,
-        alt: 'Hope Trust logo',
-      },
-    ],
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

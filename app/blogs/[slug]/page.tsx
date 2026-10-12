@@ -33,6 +33,7 @@ import ImageFallback from '@/components/ImageFallback';
 import { serializeJsonLd } from '@/components/JsonLd';
 import { siteConfig } from '@/lib/config';
 import { getLogoUrl } from '@/lib/assets';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export function generateStaticParams() {
   return getAllSlugs().map((slug) => ({ slug }));
@@ -75,7 +76,9 @@ export async function generateMetadata({
       publishedTime: post.date,
       modifiedTime: post.modified,
       authors: [author ? author.name : post.author],
-      images: post.featuredImage ? [{ url: absoluteUrl(post.featuredImage) }] : [],
+      images: post.featuredImage
+        ? [{ url: absoluteUrl(post.featuredImage) }]
+        : [DEFAULT_SHARE_IMAGE],
       siteName: 'Hope Trust',
     },
   };

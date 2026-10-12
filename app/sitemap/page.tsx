@@ -4,6 +4,7 @@ import { getArchiveCategories, getAllPostsMeta, pageCount } from '@/lib/blog';
 import Header from '@/components/Header';
 import dynamic from 'next/dynamic';
 import { Bricolage_Grotesque } from 'next/font/google';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 const Footer = dynamic(() => import('@/components/Footer'));
 
@@ -29,6 +30,7 @@ export const metadata = {
     description: 'Browse all pages on the Hope Trust website.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

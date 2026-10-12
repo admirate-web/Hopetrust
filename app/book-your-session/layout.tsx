@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { getBreadcrumbSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 /**
  * This page draws more search impressions than any other on the site — about
@@ -27,6 +28,7 @@ export const metadata: Metadata = {
     url: 'https://hopetrustindia.com/book-your-session/',
     siteName: 'Hope Trust',
     locale: 'en_IN',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

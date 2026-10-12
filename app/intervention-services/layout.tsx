@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import JsonLd from '@/components/JsonLd';
 import { interventionFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 export const metadata: Metadata = {
   title: 'Professional Addiction Intervention',
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
       'Professional intervention services to help loved ones seek addiction treatment.',
     type: 'website',
     siteName: 'Hope Trust',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 

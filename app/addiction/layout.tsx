@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import JsonLd from '@/components/JsonLd';
 import { addictionFaqs } from '@/lib/faqs';
 import { getServiceSchema, getBreadcrumbSchema, getFAQSchema } from '@/lib/jsonld';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 /**
  * Search Console had this page at positions 35–70 for the searches it exists
@@ -27,6 +28,7 @@ export const metadata: Metadata = {
     url: 'https://hopetrustindia.com/addiction/',
     siteName: 'Hope Trust',
     locale: 'en_IN',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 
