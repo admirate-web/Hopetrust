@@ -84,9 +84,12 @@ const BackgroundCirclesSection = () => {
               since 2002, in person and online.
             </p>
 
-            <button className="mt-10 inline-flex items-center justify-center rounded-full bg-[#00373E] px-8 sm:px-10 py-3 text-sm sm:text-base font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#ea6a0e] hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97]">
+            <a
+              href="/book-your-session/"
+              className="mt-10 inline-flex items-center justify-center rounded-full bg-[#00373E] px-8 sm:px-10 py-3 text-sm sm:text-base font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#ea6a0e] hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97]"
+            >
               Find A Therapist
-            </button>
+            </a>
           </div>
 
           {/* Right column: illustration on top of blue circle with tilted card effect */}
