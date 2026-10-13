@@ -555,4 +555,8 @@ Recorded 13 October 2026, from plan 1 (`docs/superpowers/plans/2026-10-13-newsle
 **Before the first real send:**
 
 - `NEWSLETTER_FROM_EMAIL` in `.env` (and later in Netlify) needs the display name: `Hope Trust <newsletter@hopetrustindia.com>`.
-- Checking Outlook and Apple Mail is still worth doing, using any inbox on those apps.
+- **Required before plan 3's first broadcast:**
+  - Check the email in Apple Mail (iPhone), Outlook.com and classic Outlook for Windows. A screenshot service is fine if no classic Outlook install is available.
+  - Use an issue that has lists, a body image, bold and italic text and a 160-character title.
+  - Check it with images blocked as well.
+  - Fixes from the final review are still untested in those apps: the Outlook-only 600 px wrapper table, `aspect="atleast"` on the hero photo, list indents set with margin, and the darker orange behind the banner when images are blocked.
