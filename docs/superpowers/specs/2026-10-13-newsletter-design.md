@@ -535,3 +535,24 @@ Each phase ends in a working state that can be reviewed.
 | Upgrading `xlsx` changes the enrollments export | Phase 2 | Keep 0.18.5 and accept CSV only for import |
 | DNS isn't done by the end of phase 2 | Phase 0 | Phases 1–3 can be built and tested using Resend's test sender to the account owner's address; nothing goes live until DNS is done |
 | "Share the blog link" meant something other than §6.5 | Spec review | Change §6.5 |
+
+## 16. Phase 1 results
+
+Recorded 13 October 2026, from plan 1 (`docs/superpowers/plans/2026-10-13-newsletter-phase-1-email-template.md`).
+
+| Check | Result |
+|---|---|
+| `.mts` function importing `lib/newsletter` (plan 1, Task 7) | Pass. `netlify functions:serve` ran a TypeScript function that imports the renderer and returned the email (18,163 bytes, unsubscribe placeholder present). `netlify functions:build` bundled the renderer into the function's zip. Plans 2 and 3 use `.mts` functions. |
+| Gmail web | Pass on every check; the user reported "everything was perfect". The email landed in the **Promotions** tab, which is normal for a newsletter and not spam. |
+| Gmail app (Android/iOS) | Pass. The user reported every check passed, including phone width, the stacked footer and dark mode. |
+| Apple Mail (iOS/macOS) | Not tested |
+| Outlook web | Not tested |
+| Outlook for Windows | Not tested. The banner's Outlook fallback (VML) is unverified there. |
+| Title banner | Overlaps the photo as in the PDF; the under-the-photo fallback wasn't needed. |
+| Sample issue size | 17.9 KB send version, against Gmail's 102 KB clipping limit |
+| SPF / DKIM / DMARC | The domain is verified in Resend. DKIM (`resend._domainkey`), SPF and MX on `send.hopetrustindia.com`, and DMARC (`p=none`) are published. The user reported all checks passed. |
+
+**Before the first real send:**
+
+- `NEWSLETTER_FROM_EMAIL` in `.env` (and later in Netlify) needs the display name: `Hope Trust <newsletter@hopetrustindia.com>`.
+- Checking Outlook and Apple Mail is still worth doing, using any inbox on those apps.
