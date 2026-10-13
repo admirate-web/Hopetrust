@@ -111,7 +111,11 @@ export function withUtm(href: string, campaign: string, siteUrl: string): string
   return url.toString();
 }
 
-/** The image URL if it is https and inside one of `prefixes` (each ending in "/"), else null. */
+/**
+ * The image URL if it is https and inside one of `prefixes` (each ending in "/"), else null.
+ * Quotes, brackets and whitespace are percent-encoded, because the hero photo
+ * also goes inside a CSS url('…') string, where they would end it early.
+ */
 export function allowedImageUrl(src: unknown, prefixes: string[]): string | null {
   if (typeof src !== 'string' || src.trim() === '') return null;
   let normalized: string;
@@ -121,7 +125,8 @@ export function allowedImageUrl(src: unknown, prefixes: string[]): string | null
     return null;
   }
   if (!normalized.startsWith('https://')) return null;
-  return prefixes.some((prefix) => prefix.endsWith('/') && normalized.startsWith(prefix)) ? normalized : null;
+  if (!prefixes.some((prefix) => prefix.endsWith('/') && normalized.startsWith(prefix))) return null;
+  return normalized.replace(/['"()\\\s]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
 }
 
 export interface BodyRenderOptions {
@@ -182,7 +187,8 @@ function renderList(node: BulletListNode | OrderedListNode, ctx: InlineContext):
     .filter((item) => item !== '')
     .map((item) => `<li style="margin:0 0 8px 0;">${item}</li>`)
     .join('');
-  return items ? `<${tag}${startAttr} style="margin:0 0 16px 0;padding:0 0 0 24px;">${items}</${tag}>` : '';
+  // Indent with margin, not padding: Outlook's Word engine ignores list padding and clips the bullets.
+  return items ? `<${tag}${startAttr} style="margin:0 0 16px 24px;padding:0;">${items}</${tag}>` : '';
 }
 
 function renderBlock(node: BlockNode, ctx: InlineContext): string {
@@ -305,12 +311,13 @@ function dateHtml(isoDate: string): string {
 
 function heroRow(issue: IssueForRender, opts: RenderOptions, logoUrl: string): string {
   const hero = allowedImageUrl(issue.hero_image_url, opts.imagePrefixes);
-  const bg = hero ? COLORS.orange : COLORS.heroFallback;
+  // Darker than the banner, so the banner still stands out when images are blocked or missing.
+  const bg = COLORS.heroFallback;
   const cellStyle = hero
     ? `background-color:${bg};background-image:url('${esc(hero)}');background-position:center center;background-size:cover;background-repeat:no-repeat;`
     : `background-color:${bg};`;
   const vmlOpen = hero
-    ? `<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;"><v:fill type="frame" src="${esc(hero)}" color="${bg}" /><v:textbox style="mso-fit-shape-to-text:true" inset="0,0,0,0"><![endif]-->`
+    ? `<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;"><v:fill type="frame" src="${esc(hero)}" color="${bg}" aspect="atleast" /><v:textbox style="mso-fit-shape-to-text:true" inset="0,0,0,0"><![endif]-->`
     : '';
   const vmlClose = hero ? '<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->' : '';
   const alt = String(issue.hero_image_alt || '').trim();
@@ -318,9 +325,9 @@ function heroRow(issue: IssueForRender, opts: RenderOptions, logoUrl: string): s
   return `<tr><td ${hero ? `background="${esc(hero)}" ` : ''}bgcolor="${bg}" valign="top" style="${cellStyle}">
 ${vmlOpen}<div>${photoLabel}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr><td align="left" style="padding:16px 16px 0 16px;"><img src="${esc(logoUrl)}" width="96" height="97" alt="Hope Trust" style="display:block;border:0;width:96px;height:auto;"></td></tr>
+<tr><td align="left" style="padding:16px 16px 0 16px;"><img src="${esc(logoUrl)}" width="96" height="97" alt="Hope Trust" style="display:block;border:0;width:96px;height:auto;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#FFFFFF;"></td></tr>
 <tr><td class="hero-spacer" height="150" style="height:150px;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td class="px-hero" style="padding:0 28px 28px 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="title" bgcolor="${COLORS.orange}" style="background-color:${COLORS.orange};border-radius:28px;padding:18px 24px;text-align:center;font-family:${FONT};font-size:26px;line-height:1.3;font-weight:500;color:${COLORS.white};">${esc(issue.title)}</td></tr></table></td></tr>
+<tr><td class="px-hero" style="padding:0 28px 28px 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="title" bgcolor="${COLORS.orange}" style="background-color:${COLORS.orange};border-radius:28px;padding:18px 24px;text-align:center;font-family:${FONT};font-size:26px;line-height:1.3;font-weight:500;color:${COLORS.white};overflow-wrap:anywhere;word-break:break-word;">${esc(issue.title)}</td></tr></table></td></tr>
 </table>
 </div>${vmlClose}
 </td></tr>`;
@@ -371,10 +378,11 @@ img{-ms-interpolation-mode:bicubic;}
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${COLORS.page};opacity:0;">${esc(preheader)}${PREHEADER_FILLER}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.page}" style="background-color:${COLORS.page};">
 <tr><td align="center" style="padding:24px 0;">
+<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.white}" style="width:100%;max-width:600px;background-color:${COLORS.white};">
 <tr><td class="px" bgcolor="${COLORS.orange}" align="right" style="background-color:${COLORS.orange};padding:12px 24px;font-family:${FONT};font-size:20px;line-height:1.3;font-weight:500;color:${COLORS.white};">${dateHtml(campaign)}</td></tr>
 ${heroRow(issue, opts, `${assetBase}/logo-v1.png`)}
-<tr><td class="px" style="padding:32px 40px 8px 40px;font-family:${FONT};font-size:15px;line-height:1.65;color:${COLORS.text};">
+<tr><td class="px" style="padding:32px 40px 8px 40px;font-family:${FONT};font-size:15px;line-height:1.65;color:${COLORS.text};overflow-wrap:anywhere;word-break:break-word;">
 ${body}
 </td></tr>
 <tr><td class="px" align="center" style="padding:16px 40px 36px 40px;"><table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${COLORS.yellow}" style="background-color:${COLORS.yellow};border-radius:40px;mso-padding-alt:14px 44px;"><a href="${esc(bookHref)}" style="display:inline-block;padding:14px 44px;font-family:${FONT};font-size:20px;line-height:1.2;letter-spacing:1px;font-weight:500;color:${COLORS.text};text-decoration:none;">BOOK YOUR SESSION</a></td></tr></table></td></tr>
@@ -390,6 +398,7 @@ ${body}
 </tr></table></td></tr>
 <tr><td class="px" style="padding:8px 24px 28px 24px;text-align:center;font-family:${FONT};font-size:12px;line-height:1.5;color:${COLORS.muted};">${esc(WHY_LINE)}</td></tr>
 </table>
+<!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 </table>
 </body>

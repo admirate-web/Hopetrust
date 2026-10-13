@@ -81,6 +81,29 @@ describe('renderIssueHtml: header and hero', () => {
     expect(html).toContain(`bgcolor="${COLORS.heroFallback}"`);
   });
 
+  it('keeps the hero URL inside the CSS url() string, whatever characters it holds', () => {
+    for (const url of [
+      `${IMAGES}/issues/mother's-day.jpg`,
+      `${IMAGES}/x');background-image:url('https://tracker.example/p.png`,
+    ]) {
+      const page = new DOMParser().parseFromString(render({ hero_image_url: url }).html, 'text/html');
+      const style =
+        [...page.querySelectorAll('td')]
+          .map((td) => td.getAttribute('style') ?? '')
+          .find((value) => value.includes('background-image')) ?? '';
+      expect(style.match(/url\(/g)).toHaveLength(1);
+      expect(/url\('([^']*)'\)/.exec(style)?.[1].startsWith(`${IMAGES}/`)).toBe(true);
+      expect(style).toContain('background-size:cover;');
+    }
+  });
+
+  it('keeps the banner visible with images blocked: darker orange behind it even when there is a photo', () => {
+    const { html } = render();
+    expect(html).toContain(`bgcolor="${COLORS.heroFallback}" valign="top"`);
+    expect(html).toContain(`color="${COLORS.heroFallback}" aspect="atleast"`);
+    expect(html).toMatch(/<img src="[^"]*logo-v1\.png"[^>]*alt="Hope Trust" style="[^"]*color:#FFFFFF;/);
+  });
+
   it('escapes the title, keeping emoji and Hindi text as typed', () => {
     const title = '"Mind & Body" <Part 2> 🌿 मन';
     const { html } = render({ title });
@@ -149,6 +172,22 @@ describe('renderIssueHtml: links', () => {
     expect(render({ share_url: 'javascript:alert(1)' }).html).toContain(
       `href="${shareHrefFor('The Most Important Connection', 'https://hopetrustindia.com/blogs/')}"`,
     );
+  });
+});
+
+describe('renderIssueHtml: Outlook and phones', () => {
+  it('wraps the container in an Outlook-only 600 px table, so classic Outlook does not stretch it', () => {
+    const { html } = render();
+    expect(html).toContain(
+      '<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->\n<table role="presentation" class="container"',
+    );
+    expect(html).toContain('</table>\n<!--[if mso]></td></tr></table><![endif]-->');
+  });
+
+  it('lets long unbroken text, like a pasted URL, wrap instead of widening the email', () => {
+    const { html } = render();
+    expect(html).toMatch(/class="title"[^>]*style="[^"]*overflow-wrap:anywhere;word-break:break-word;/);
+    expect(html).toMatch(/<td class="px" style="padding:32px 40px 8px 40px;[^"]*overflow-wrap:anywhere;word-break:break-word;/);
   });
 });
 

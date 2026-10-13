@@ -75,7 +75,7 @@ describe('renderBodyHtml', () => {
     expect(html.match(/<h2 /g)).toHaveLength(1);
   });
 
-  it('renders bulleted and numbered lists, including a nested one', () => {
+  it('renders bulleted and numbered lists, indented with margin so Outlook keeps the bullets', () => {
     const html = renderBodyHtml(
       doc({
         type: 'bulletList',
@@ -96,8 +96,8 @@ describe('renderBodyHtml', () => {
       opts,
     );
     expect(html).toBe(
-      '<ul style="margin:0 0 16px 0;padding:0 0 0 24px;"><li style="margin:0 0 8px 0;">Pause' +
-        '<ol start="3" style="margin:0 0 16px 0;padding:0 0 0 24px;"><li style="margin:0 0 8px 0;">Breathe</li></ol>' +
+      '<ul style="margin:0 0 16px 24px;padding:0;"><li style="margin:0 0 8px 0;">Pause' +
+        '<ol start="3" style="margin:0 0 16px 24px;padding:0;"><li style="margin:0 0 8px 0;">Breathe</li></ol>' +
         '</li></ul>',
     );
   });

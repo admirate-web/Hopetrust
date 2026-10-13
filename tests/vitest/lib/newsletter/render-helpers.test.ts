@@ -111,6 +111,12 @@ describe('allowedImageUrl', () => {
     expect(allowedImageUrl(null, prefixes)).toBeNull();
     expect(allowedImageUrl('', prefixes)).toBeNull();
   });
+
+  it('percent-encodes quotes and brackets so the URL is safe inside CSS url()', () => {
+    expect(allowedImageUrl(`${IMAGES}/issues/mother's day (1).jpg`, prefixes)).toBe(
+      `${IMAGES}/issues/mother%27s%20day%20%281%29.jpg`,
+    );
+  });
 });
 
 describe('newsletterImagesBase', () => {
