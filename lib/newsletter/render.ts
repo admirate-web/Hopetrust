@@ -7,6 +7,16 @@
 // nothing at runtime, only `import type`, which disappears when types are
 // stripped.
 
+import type {
+  BlockNode,
+  BodyDoc,
+  BulletListNode,
+  InlineNode,
+  ListItemNode,
+  Mark,
+  OrderedListNode,
+} from './content';
+
 /** Colours sampled from the design PDF (docs/design/newsletter-template-2026-10.pdf). */
 export const COLORS = {
   orange: '#EE7429',
@@ -111,4 +121,132 @@ export function allowedImageUrl(src: unknown, prefixes: string[]): string | null
   }
   if (!normalized.startsWith('https://')) return null;
   return prefixes.some((prefix) => prefix.endsWith('/') && normalized.startsWith(prefix)) ? normalized : null;
+}
+
+export interface BodyRenderOptions {
+  siteUrl: string;
+  /** The utm_campaign value: the issue date. */
+  campaign: string;
+  imagePrefixes: string[];
+}
+
+interface InlineContext extends BodyRenderOptions {
+  linkColor: string;
+}
+
+function renderInline(nodes: InlineNode[] | undefined, ctx: InlineContext): string {
+  if (!Array.isArray(nodes)) return '';
+  return nodes
+    .map((node) => {
+      if (!node || typeof node !== 'object') return '';
+      if (node.type === 'hardBreak') return '<br>';
+      if (node.type !== 'text' || typeof node.text !== 'string') return '';
+      const marks: Mark[] = Array.isArray(node.marks) ? node.marks : [];
+      let out = esc(node.text);
+      if (marks.some((mark) => mark?.type === 'bold')) out = `<strong style="font-weight:700;">${out}</strong>`;
+      if (marks.some((mark) => mark?.type === 'italic')) out = `<em style="font-style:italic;">${out}</em>`;
+      const link = marks.find((mark): mark is Extract<Mark, { type: 'link' }> => mark?.type === 'link');
+      const href = link ? resolveHref(link.attrs?.href, ctx.siteUrl) : null;
+      if (href) {
+        out = `<a href="${esc(withUtm(href, ctx.campaign, ctx.siteUrl))}" style="color:${ctx.linkColor};text-decoration:underline;">${out}</a>`;
+      }
+      return out;
+    })
+    .join('');
+}
+
+function renderListItem(item: ListItemNode, ctx: InlineContext): string {
+  let out = '';
+  let afterText = false;
+  for (const child of Array.isArray(item?.content) ? item.content : []) {
+    if (child?.type === 'paragraph') {
+      const text = renderInline(child.content, ctx);
+      if (!text) continue;
+      out += (afterText ? '<br>' : '') + text;
+      afterText = true;
+    } else if (child?.type === 'bulletList' || child?.type === 'orderedList') {
+      out += renderList(child, ctx);
+      afterText = false;
+    }
+  }
+  return out;
+}
+
+function renderList(node: BulletListNode | OrderedListNode, ctx: InlineContext): string {
+  const tag = node.type === 'orderedList' ? 'ol' : 'ul';
+  const start = node.type === 'orderedList' ? node.attrs?.start : undefined;
+  const startAttr = typeof start === 'number' && Number.isInteger(start) && start > 1 ? ` start="${start}"` : '';
+  const items = (Array.isArray(node.content) ? node.content : [])
+    .map((item) => renderListItem(item, ctx))
+    .filter((item) => item !== '')
+    .map((item) => `<li style="margin:0 0 8px 0;">${item}</li>`)
+    .join('');
+  return items ? `<${tag}${startAttr} style="margin:0 0 16px 0;padding:0 0 0 24px;">${items}</${tag}>` : '';
+}
+
+function renderBlock(node: BlockNode, ctx: InlineContext): string {
+  if (!node || typeof node !== 'object') return '';
+  switch (node.type) {
+    case 'paragraph':
+      return `<p style="margin:0 0 16px 0;">${renderInline(node.content, ctx) || '&nbsp;'}</p>`;
+    case 'heading': {
+      const inner = renderInline(node.content, ctx);
+      if (!inner) return '';
+      if (node.attrs?.level === 3) {
+        return `<h3 style="margin:24px 0 10px 0;font-family:${FONT};font-size:18px;line-height:1.35;font-weight:700;color:${COLORS.text};">${inner}</h3>`;
+      }
+      return `<h2 style="margin:32px 0 12px 0;font-family:${FONT};font-size:22px;line-height:1.3;font-weight:700;color:${COLORS.text};text-align:center;">${inner}</h2>`;
+    }
+    case 'bulletList':
+    case 'orderedList':
+      return renderList(node, ctx);
+    case 'blockquote': {
+      const quoteCtx: InlineContext = { ...ctx, linkColor: COLORS.white };
+      const lines = (Array.isArray(node.content) ? node.content : [])
+        .map((paragraph) => renderInline(paragraph?.content, quoteCtx))
+        .filter((line) => line !== '');
+      if (!lines.length) return '';
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td bgcolor="${COLORS.orange}" style="background-color:${COLORS.orange};border-radius:16px;padding:24px 28px;text-align:center;font-family:${FONT};font-size:24px;line-height:1.35;font-weight:500;color:${COLORS.white};">${lines.join('<br><br>')}</td></tr></table>`;
+    }
+    case 'horizontalRule':
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;"><tr><td style="border-top:2px solid ${COLORS.orange};font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+    case 'image': {
+      const src = allowedImageUrl(node.attrs?.src, ctx.imagePrefixes);
+      if (!src) return '';
+      return `<img src="${esc(src)}" alt="${esc(node.attrs?.alt ?? '')}" width="520" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:12px;margin:8px 0 20px 0;">`;
+    }
+    default:
+      return '';
+  }
+}
+
+/** The issue body as email-safe HTML, using only the content allowed by spec §6.3. */
+export function renderBodyHtml(doc: BodyDoc, opts: BodyRenderOptions): string {
+  const blocks = doc && Array.isArray(doc.content) ? doc.content : [];
+  const ctx: InlineContext = { ...opts, linkColor: COLORS.orange };
+  return blocks
+    .map((block) => renderBlock(block, ctx))
+    .filter((html) => html !== '')
+    .join('\n');
+}
+
+function inlineText(nodes: InlineNode[] | undefined): string {
+  if (!Array.isArray(nodes)) return '';
+  return nodes
+    .map((node) => {
+      if (node?.type === 'hardBreak') return ' ';
+      return node?.type === 'text' && typeof node.text === 'string' ? node.text : '';
+    })
+    .join('');
+}
+
+/** The first paragraph's text, used as the inbox preview line when none is set. */
+export function bodyPreviewText(doc: BodyDoc | undefined, max = 140): string {
+  const blocks = doc && Array.isArray(doc.content) ? doc.content : [];
+  for (const block of blocks) {
+    if (block?.type !== 'paragraph') continue;
+    const text = inlineText(block.content).replace(/\s+/g, ' ').trim();
+    if (text) return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+  }
+  return '';
 }
