@@ -253,7 +253,11 @@ export function bodyPreviewText(doc: BodyDoc | undefined, max = 140): string {
   for (const block of blocks) {
     if (block?.type !== 'paragraph') continue;
     const text = inlineText(block.content).replace(/\s+/g, ' ').trim();
-    if (text) return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+    if (text) {
+      // Count code points, so the cut never lands inside an emoji.
+      const chars = Array.from(text);
+      return chars.length > max ? `${chars.slice(0, max - 1).join('').trimEnd()}…` : text;
+    }
   }
   return '';
 }
