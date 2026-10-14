@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
+import { hashEmail } from '@/netlify/functions/_shared/newsletter-crypto.mts';
 import { ResendError, type ResendClient } from '@/netlify/functions/_shared/resend.mts';
 import { planPull, pushAndRecord, runSync } from '@/netlify/functions/_shared/newsletter-sync.mts';
 import { SEGMENT, makeDeps } from './fakes';
@@ -14,7 +15,7 @@ function row(id: string, email: string, status: 'pending' | 'subscribed' | 'unsu
 describe('planPull', () => {
   it('marks rows unsubscribed on Resend\'s page, when nothing here is waiting to go to Resend', () => {
     const plan = planPull([{ id: 'c1', email: 'a@example.com', unsubscribed: true }], [row('r1', 'a@example.com', 'subscribed', SYNCED)]);
-    expect(plan).toEqual({ markUnsubscribed: ['r1'], repush: [], removeFromSegment: [] });
+    expect(plan).toEqual({ markUnsubscribed: ['r1'], repush: [], removeFromSegment: [], deleteContact: [] });
   });
 
   it('leaves rows with a waiting change for the push: that change is newer consent', () => {
@@ -38,9 +39,23 @@ describe('planPull', () => {
     expect(plan.removeFromSegment).toEqual(['c1', 'c2']);
   });
 
+  it('deletes the contact of an erased person with no row, instead of only taking it out of the segment', () => {
+    const plan = planPull(
+      [
+        { id: 'c1', email: 'Gone@Example.com', unsubscribed: false },
+        { id: 'c2', email: 'stranger@example.com', unsubscribed: false },
+        { id: 'c3', email: 'pending@example.com', unsubscribed: false },
+      ],
+      [row('r3', 'pending@example.com', 'pending', null)],
+      new Set([hashEmail('gone@example.com'), hashEmail('pending@example.com')]),
+    );
+    expect(plan.deleteContact).toEqual(['c1']);
+    expect(plan.removeFromSegment).toEqual(['c2', 'c3']);
+  });
+
   it('leaves subscribed rows alone and matches addresses whatever their case', () => {
     const plan = planPull([{ id: 'c1', email: 'Asha@Example.com', unsubscribed: false }], [row('r1', 'asha@example.com', 'subscribed', SYNCED)]);
-    expect(plan).toEqual({ markUnsubscribed: [], repush: [], removeFromSegment: [] });
+    expect(plan).toEqual({ markUnsubscribed: [], repush: [], removeFromSegment: [], deleteContact: [] });
   });
 });
 
@@ -62,6 +77,15 @@ describe('runSync: push', () => {
     await runSync(deps, { pull: false, deadline: deadline(deps) });
     expect(contact.unsubscribed).toBe(true);
     expect(memory.get(r.id)?.resend_synced_at).not.toBeNull();
+  });
+
+  it('remembers the contact found by address when the stored contact id is stale', async () => {
+    const { deps, memory, resend } = makeDeps();
+    const contact = resend.add('a@example.com', { segments: [SEGMENT] });
+    const r = memory.seed({ email: 'a@example.com', status: 'unsubscribed', resend_contact_id: 'contact-deleted' });
+    await runSync(deps, { pull: false, deadline: deadline(deps) });
+    expect(contact.unsubscribed).toBe(true);
+    expect(memory.get(r.id)?.resend_contact_id).toBe(contact.id);
   });
 
   it('counts an unsubscribe as sent when Resend never had the contact', async () => {
@@ -194,6 +218,54 @@ describe('runSync: pull', () => {
     expect(stray.segments.has(SEGMENT)).toBe(false);
     expect(resubscribed.unsubscribed).toBe(true);
     expect(report.removedFromSegment).toBe(1);
+  });
+
+  it('does not undo a confirmation that reached Resend after the segment was read', async () => {
+    const { deps, memory, resend, clock } = makeDeps();
+    // Unsubscribed on Resend's page earlier, and a pull recorded it.
+    const contact = resend.add('a@example.com', { unsubscribed: true, segments: [SEGMENT] });
+    const r = memory.seed({
+      email: 'a@example.com',
+      status: 'unsubscribed',
+      unsubscribe_source: 'resend',
+      resend_contact_id: contact.id,
+      resend_synced_at: SYNCED,
+    });
+    const racing: ResendClient = {
+      ...deps.resend,
+      async listSegmentContacts(segmentId, after) {
+        const page = await deps.resend.listSegmentContacts(segmentId, after);
+        // While the list is on its way back, the person confirms again and the confirmation is pushed.
+        clock.advance(1000);
+        const confirmed = await deps.db.update(r.id, {
+          status: 'subscribed',
+          unsubscribed_at: null,
+          unsubscribe_source: null,
+          resend_synced_at: null,
+        });
+        await pushAndRecord(deps, confirmed!);
+        return page;
+      },
+    };
+
+    const report = await runSync({ ...deps, resend: racing }, { pull: true, deadline: deadline(deps) });
+    expect(report.unsubscribedInResend).toBe(0);
+    expect(memory.get(r.id)).toMatchObject({ status: 'subscribed', unsubscribe_source: null });
+    expect(contact.unsubscribed).toBe(false);
+  });
+
+  it('deletes the contact of an erased person that a crossing push brought back', async () => {
+    const { deps, memory, resend } = makeDeps();
+    resend.add('gone@example.com', { segments: [SEGMENT] });
+    const stray = resend.add('stray@example.com', { segments: [SEGMENT] });
+    memory.erased.add(hashEmail('gone@example.com'));
+
+    const report = await runSync(deps, { pull: true, deadline: deadline(deps) });
+    expect(resend.find('gone@example.com')).toBeUndefined();
+    // Someone never erased is only taken out of the segment.
+    expect(resend.find('stray@example.com')).toBe(stray);
+    expect(stray.segments.has(SEGMENT)).toBe(false);
+    expect(report).toMatchObject({ removedFromSegment: 2, failed: 0 });
   });
 
   it('skips reading Resend when pull is false', async () => {

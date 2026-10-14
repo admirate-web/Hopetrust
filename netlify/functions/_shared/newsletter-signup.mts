@@ -18,7 +18,7 @@ import { clientIp, jsonResponse, preflight, readJsonBody } from './http.mts';
 import { TOKEN_PATTERN, hashEmail, hashToken, newToken } from './newsletter-crypto.mts';
 import { DuplicateEmailError } from './newsletter-db.mts';
 import type { NewsletterDeps } from './newsletter-deps.mts';
-import { pushAndRecord } from './newsletter-sync.mts';
+import { pullOne, pushAndRecord } from './newsletter-sync.mts';
 
 const METHODS = 'POST, OPTIONS';
 const MAX_BODY_BYTES = 4096;
@@ -175,7 +175,16 @@ async function sendConfirmation(
   ip: string | null,
 ): Promise<void> {
   const { db, resend, config } = deps;
-  const existing = await db.findByEmail(input.email);
+  let existing = await db.findByEmail(input.email);
+  // Someone who unsubscribed on Resend's page since the last sync still shows
+  // as subscribed here. Ask Resend, so they can sign up again straight away.
+  if (existing?.status === 'subscribed') {
+    const subscribed = existing;
+    existing = await pullOne(deps, subscribed).catch((err) => {
+      console.error('[newsletter-subscribe] checking Resend', err);
+      return subscribed;
+    });
+  }
   if (signupDecision(existing, new Date(now)) === 'skip') return;
 
   const token = newToken();

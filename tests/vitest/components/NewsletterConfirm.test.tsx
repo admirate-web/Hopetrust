@@ -37,11 +37,13 @@ describe('NewsletterConfirm', () => {
     expect(window.location.hash).toBe('');
   });
 
-  it('offers the form again when the link has expired', async () => {
+  it('offers the form again when the link has expired or was already used', async () => {
     fetchMock.mockResolvedValue(reply(400, { error: 'expired', message: 'This link has expired or was already used.' }));
     render(<NewsletterConfirm />);
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm my subscription' }));
-    expect(await screen.findByRole('heading', { name: 'This link has expired' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'This link has expired or was already used' })).toBeInTheDocument();
+    // A second click on a used link lands here too: tell them they may already be in.
+    expect(screen.getByText("If you already confirmed, you're subscribed.")).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
   });
 

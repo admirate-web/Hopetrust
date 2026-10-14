@@ -136,13 +136,13 @@ export function createMemoryDb(now: () => Date) {
     async list(filters, limit, offset) {
       const found = all()
         .filter((r) => matches(r, filters))
-        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+        .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
       return { rows: found.slice(offset, offset + limit).map(stripToken), total: found.length };
     },
     async listAll(filters) {
       return all()
         .filter((r) => matches(r, filters))
-        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
         .map(stripToken);
     },
     async counts() {
@@ -197,11 +197,11 @@ export function createMemoryDb(now: () => Date) {
     async countToPush() {
       return all().filter(waiting).length;
     },
-    async markPulledUnsubscribed(ids, nowIso) {
+    async markPulledUnsubscribed(ids, nowIso, listedAtIso) {
       let changed = 0;
       for (const id of ids) {
         const r = rows.get(id);
-        if (r && r.status === 'subscribed' && r.resend_synced_at !== null) {
+        if (r && r.status === 'subscribed' && r.resend_synced_at !== null && r.resend_synced_at < listedAtIso) {
           rows.set(id, {
             ...r,
             status: 'unsubscribed',

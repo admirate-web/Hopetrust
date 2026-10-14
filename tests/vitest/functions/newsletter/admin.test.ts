@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { handleAdminSubscribers } from '@/netlify/functions/_shared/newsletter-admin.mts';
 import { hashEmail } from '@/netlify/functions/_shared/newsletter-crypto.mts';
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
@@ -9,6 +9,11 @@ const BASE = 'https://hopetrustindia.com/api/admin-newsletter-subscribers';
 const AUTH = { authorization: `Bearer ${ADMIN_TOKEN}` };
 const BATCH = '2f1c7c1e-3f5a-4a52-9a0e-6c1f3b9d2a10';
 const STATEMENT = 'Clients who ticked the newsletter box on the intake form, 2025–26';
+const DAY = 24 * 60 * 60_000;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function call(deps: NewsletterDeps, method: string, query = '', body?: unknown) {
   return handleAdminSubscribers(jsonRequest(`${BASE}${query}`, method, body, AUTH), deps);
@@ -45,6 +50,52 @@ describe('admin-newsletter-subscribers', () => {
     expect(body).toMatchObject({ total: 3, counts: { pending: 1, subscribed: 1, unsubscribed: 1 }, needs_push: 2, limit: 25, offset: 0 });
   });
 
+  it('deletes sign-ups left unconfirmed for 30 days when the list loads', async () => {
+    const { deps, memory } = makeDeps();
+    const old = new Date(deps.now().getTime() - 31 * DAY).toISOString();
+    const stale = memory.seed({ email: 'stale@example.com', status: 'pending', confirm_sent_at: old });
+    const left = memory.seed({ email: 'left@example.com', status: 'unsubscribed', created_at: old, unsubscribed_at: old });
+    memory.seed({ email: 'fresh@example.com', status: 'pending', confirm_sent_at: deps.now().toISOString() });
+
+    const body = await (await call(deps, 'GET')).json();
+    expect(memory.get(stale.id)).toBeUndefined();
+    expect(memory.get(left.id)).toBeDefined();
+    expect(body.subscribers.map((s: { email: string }) => s.email)).not.toContain('stale@example.com');
+    expect(body.counts.pending).toBe(1);
+  });
+
+  it('still lists when that clean-up fails', async () => {
+    const { deps, memory } = makeDeps();
+    memory.seed({ email: 'a@example.com' });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const broken: NewsletterDeps = {
+      ...deps,
+      db: {
+        ...deps.db,
+        deleteStalePending: async () => {
+          throw new Error('Supabase is down');
+        },
+      },
+    };
+    const res = await call(broken, 'GET');
+    expect(res.status).toBe(200);
+    expect((await res.json()).total).toBe(1);
+  });
+
+  it('breaks ties in creation time by id, so pages never repeat or skip a row', async () => {
+    const { deps, memory } = makeDeps();
+    // One import chunk is one statement, so its rows share a created_at.
+    const created = '2026-10-14T09:00:00.000Z';
+    const ids = ['b@example.com', 'a@example.com', 'c@example.com'].map((email) => memory.seed({ email, created_at: created }).id);
+    const page = async (offset: number) =>
+      (await (await call(deps, 'GET', `?limit=1&offset=${offset}`)).json()).subscribers[0].id;
+    expect([await page(0), await page(1), await page(2)]).toEqual([...ids].sort().reverse());
+
+    const csv = await (await call(deps, 'GET', '?format=csv')).text();
+    const emails = csv.trim().split('\r\n').slice(1).map((line) => line.split(',')[0]);
+    expect(emails).toEqual(['b@example.com', 'a@example.com', 'c@example.com']);
+  });
+
   it('filters by status, source and search, and caps the page size at 100', async () => {
     const { deps, memory } = makeDeps();
     memory.seed({ email: 'asha@example.com', full_name: 'Asha Rao', source: 'import' });
@@ -76,6 +127,18 @@ describe('admin-newsletter-subscribers', () => {
     expect(lines[1]).toContain(`"'=HYPERLINK(""http://x"",""click"")"`);
     expect(lines[2]).toContain('రవి');
     expect(memory.audits).toEqual([expect.objectContaining({ action: 'NEWSLETTER_EXPORT', actorEmail: ADMIN_EMAIL, metadata: expect.objectContaining({ rows: 2 }) })]);
+  });
+
+  it('records whether an export was searched, never the search text', async () => {
+    const { deps, memory } = makeDeps();
+    memory.seed({ email: 'asha@example.com', full_name: 'Asha Rao' });
+    await call(deps, 'GET', '?format=csv&status=subscribed&q=asha%40example.com');
+    await call(deps, 'GET', '?format=csv');
+    expect(memory.audits.map((a) => a.metadata)).toEqual([
+      { rows: 1, status: 'subscribed', source: '', q_used: true },
+      { rows: 1, status: '', source: '', q_used: false },
+    ]);
+    expect(JSON.stringify(memory.audits)).not.toContain('asha');
   });
 
   it('imports new addresses as subscribed, with the consent evidence', async () => {

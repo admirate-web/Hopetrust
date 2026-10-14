@@ -18,6 +18,7 @@ import { clientIp, corsHeaders, jsonResponse, preflight, readJsonBody } from './
 import { hashEmail } from './newsletter-crypto.mts';
 import type { SubscriberFilters } from './newsletter-db.mts';
 import type { NewsletterDeps } from './newsletter-deps.mts';
+import { SIGNUP_RULES } from './newsletter-signup.mts';
 import { SYNC_TIME_BUDGET_MS, pushAndRecord, runSync } from './newsletter-sync.mts';
 
 const METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
@@ -97,7 +98,10 @@ export async function handleAdminSubscribers(req: Request, deps: NewsletterDeps 
   const params = new URL(req.url).searchParams;
   const ctx: Ctx = { req, deps, admin, params, reply };
   try {
-    if (req.method === 'GET') return params.get('format') === 'csv' ? await exportCsv(ctx) : await list(ctx);
+    if (req.method === 'GET') {
+      await deleteStalePending(deps);
+      return params.get('format') === 'csv' ? await exportCsv(ctx) : await list(ctx);
+    }
     if (req.method === 'POST' && params.get('action') === 'import') return await importRows(ctx);
     if (req.method === 'POST' && params.get('action') === 'sync') return await sync(ctx);
     if (req.method === 'PATCH') return await unsubscribe(ctx);
@@ -107,6 +111,15 @@ export async function handleAdminSubscribers(req: Request, deps: NewsletterDeps 
     console.error('[admin-newsletter-subscribers]', err);
     return reply({ error: 'Something went wrong. Please try again.' }, 500);
   }
+}
+
+/**
+ * The 30-day rule for unconfirmed sign-ups (spec §7.2), run here too so a
+ * quiet week without sign-ups doesn't keep them longer. Errors are only logged.
+ */
+async function deleteStalePending(deps: NewsletterDeps): Promise<void> {
+  const before = new Date(deps.now().getTime() - SIGNUP_RULES.pendingLifetimeMs).toISOString();
+  await deps.db.deleteStalePending(before).catch((err) => console.error('[admin-newsletter-subscribers] clean-up', err));
 }
 
 async function list({ deps, params, reply }: Ctx): Promise<Response> {
@@ -126,7 +139,8 @@ async function exportCsv({ req, deps, admin, params }: Ctx): Promise<Response> {
   await deps.db.audit({
     action: 'NEWSLETTER_EXPORT',
     actorEmail: admin.email,
-    metadata: { rows: rows.length, ...filters },
+    // Whether a search was used, not its text: it may be an address that is later erased.
+    metadata: { rows: rows.length, status: filters.status, source: filters.source, q_used: Boolean(filters.q?.trim()) },
     ip: clientIp(req),
   });
   return new Response(toCsv(rows), {

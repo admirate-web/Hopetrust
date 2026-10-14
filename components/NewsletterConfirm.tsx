@@ -94,10 +94,13 @@ export default function NewsletterConfirm() {
 
       {(state === 'expired' || state === 'missing') && (
         <>
-          <h1 className={heading}>{state === 'expired' ? 'This link has expired' : 'This link is incomplete'}</h1>
+          <h1 className={heading}>
+            {state === 'expired' ? 'This link has expired or was already used' : 'This link is incomplete'}
+          </h1>
+          {state === 'expired' && <p className={body}>If you already confirmed, you&apos;re subscribed.</p>}
           <p className={body}>
             {state === 'expired'
-              ? "Confirmation links work once and last 7 days. Sign up again and we'll send you a new one."
+              ? "Confirmation links work once and last 7 days. If you haven't confirmed yet, sign up again and we'll send you a new one."
               : "Open the link in the confirmation email again, or sign up below and we'll send you a new one."}
           </p>
           <div className="mt-6">

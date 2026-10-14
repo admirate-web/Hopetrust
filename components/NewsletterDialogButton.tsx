@@ -1,29 +1,34 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'motion/react';
-import { X } from 'lucide-react';
-import NewsletterForm from '@/components/NewsletterForm';
+import { Loader2, X } from 'lucide-react';
+
+// The form (and zod with it) loads when the dialog first opens, so the footer
+// doesn't add it to every page.
+const NewsletterForm = dynamic(() => import('@/components/NewsletterForm'), {
+  ssr: false,
+  loading: () => <Loader2 aria-label="Loading" className="mx-auto my-16 h-5 w-5 animate-spin text-[#ED7428]" />,
+});
+
+/** Starts fetching the form as soon as someone points at or tabs to the button. */
+function preloadForm() {
+  void import('@/components/NewsletterForm');
+}
 
 /** The footer's "Subscribe to our newsletter" button and its dialog (spec §7.1). */
 export default function NewsletterDialogButton({ className = '' }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
 
-  // Focus the first field on open; hand focus back to the button on close.
+  // Hand focus back to the button on close. The form focuses its own first
+  // field when it appears, which may be after the dialog opens.
   useEffect(() => {
-    if (open) {
-      wasOpen.current = true;
-      const timer = setTimeout(
-        () => dialogRef.current?.querySelector<HTMLInputElement>('input:not([tabindex="-1"])')?.focus(),
-        50,
-      );
-      return () => clearTimeout(timer);
-    }
-    if (wasOpen.current) buttonRef.current?.focus();
+    if (open) wasOpen.current = true;
+    else if (wasOpen.current) buttonRef.current?.focus();
   }, [open]);
 
   // While open: no page scrolling behind the dialog, and Escape closes it.
@@ -43,7 +48,14 @@ export default function NewsletterDialogButton({ className = '' }: { className?:
 
   return (
     <>
-      <button ref={buttonRef} type="button" onClick={() => setOpen(true)} className={className}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        onPointerEnter={preloadForm}
+        onFocus={preloadForm}
+        className={className}
+      >
         Subscribe to our newsletter
       </button>
       <AnimatePresence>
@@ -66,7 +78,7 @@ export default function NewsletterDialogButton({ className = '' }: { className?:
               transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
               className="relative w-full max-w-[460px] rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
             >
-              <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="p-6 sm:p-8">
+              <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="p-6 sm:p-8">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
@@ -81,7 +93,7 @@ export default function NewsletterDialogButton({ className = '' }: { className?:
                 <p className="mb-5 mt-2 text-sm text-[#00373E]/70">
                   A monthly letter from our team, with ideas you can use between sessions.
                 </p>
-                <NewsletterForm variant="card" />
+                <NewsletterForm variant="card" autoFocus />
               </div>
             </motion.div>
           </motion.div>

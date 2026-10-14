@@ -46,6 +46,30 @@ describe('createNewsletterDb queries', () => {
       ['gte', 'confirm_sent_at', '2026-10-14T09:00:00.000Z'],
     ]);
   });
+
+  it('orders the list and the export by creation time, then id', async () => {
+    const { db, calls } = recordingSupabase();
+    const orders = () => calls.filter(([name]) => name === 'order');
+    await db.list({}, 25, 0);
+    expect(orders()).toEqual([
+      ['order', 'created_at', { ascending: false }],
+      ['order', 'id', { ascending: false }],
+    ]);
+    calls.length = 0;
+    await db.listAll({});
+    expect(orders()).toEqual([
+      ['order', 'created_at', { ascending: true }],
+      ['order', 'id', { ascending: true }],
+    ]);
+  });
+
+  it('marks pulled unsubscribes only on rows last synced before the segment was read', async () => {
+    const { db, calls } = recordingSupabase();
+    await db.markPulledUnsubscribed(['r1'], '2026-10-14T10:00:05.000Z', '2026-10-14T10:00:00.000Z');
+    expect(calls).toContainEqual(['in', 'id', ['r1']]);
+    expect(calls).toContainEqual(['eq', 'status', 'subscribed']);
+    expect(calls).toContainEqual(['lt', 'resend_synced_at', '2026-10-14T10:00:00.000Z']);
+  });
 });
 
 const SECRET = 'test-secret-that-is-long-enough!!';

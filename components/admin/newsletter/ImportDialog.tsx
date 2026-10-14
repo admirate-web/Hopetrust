@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { IMPORT_CHUNK, chunk, cleanRows, guessColumns, pickColumns, splitHeader, type Sheet } from '@/lib/newsletter/import';
 import { readSpreadsheet } from '@/lib/newsletter/read-spreadsheet';
@@ -39,6 +39,16 @@ export default function ImportDialog({ token, onClose, onFinished, onUnauthorize
   const [progressValue, setProgressValue] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [sync, setSync] = useState<SyncResult | null>(null);
+
+  // Escape closes the dialog, except while an import is running.
+  useEffect(() => {
+    if (step === 'working') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [step, onClose]);
 
   const preview = sheet ? cleanRows(pickColumns(sheet, emailCol, nameCol)) : null;
   const ready = !!preview && preview.rows.length > 0 && statement.trim().length >= 10 && attested;

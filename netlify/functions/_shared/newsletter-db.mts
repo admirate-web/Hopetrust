@@ -61,8 +61,12 @@ export interface NewsletterDb {
   /** Subscribed or unsubscribed rows with a change Resend hasn't seen, oldest change first. */
   rowsToPush(limit: number): Promise<SubscriberRow[]>;
   countToPush(): Promise<number>;
-  /** Unsubscribes rows on Resend's word, skipping any row with a change waiting to go to Resend. */
-  markPulledUnsubscribed(ids: string[], nowIso: string): Promise<number>;
+  /**
+   * Unsubscribes rows on Resend's word, skipping any row with a change waiting
+   * to go to Resend, or one synced at or after `listedAtIso`: Resend's answer
+   * was read before that change reached it.
+   */
+  markPulledUnsubscribed(ids: string[], nowIso: string, listedAtIso: string): Promise<number>;
   markNeedsPush(ids: string[]): Promise<void>;
   /** Writes admin_audit_log; never throws. */
   audit(entry: AuditEntry): Promise<void>;
@@ -183,9 +187,12 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
       return (sent.data?.length ?? 0) + (neverSent.data?.length ?? 0);
     },
 
+    // Rows from one import chunk share a created_at, so id breaks the tie and
+    // paging neither repeats nor skips a row.
     async list(filters, limit, offset) {
       const { data, error, count } = await filtered(table().select(ADMIN_COLUMNS, { count: 'exact' }), filters)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
       check(error);
       return { rows: (data ?? []) as AdminSubscriber[], total: count ?? 0 };
@@ -193,7 +200,10 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
 
     listAll: (filters) =>
       allPages<AdminSubscriber>((from, to) =>
-        filtered(table().select(ADMIN_COLUMNS), filters).order('created_at', { ascending: true }).range(from, to),
+        filtered(table().select(ADMIN_COLUMNS), filters)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
       ),
 
     async counts() {
@@ -264,14 +274,15 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
     countToPush: () =>
       headCount((query) => query.in('status', ['subscribed', 'unsubscribed']).is('resend_synced_at', null)),
 
-    async markPulledUnsubscribed(ids, nowIso) {
+    async markPulledUnsubscribed(ids, nowIso, listedAtIso) {
       let changed = 0;
       for (const part of chunked(ids, IN_CHUNK)) {
         const { data, error } = await table()
           .update({ status: 'unsubscribed', unsubscribed_at: nowIso, unsubscribe_source: 'resend', resend_synced_at: nowIso })
           .in('id', part)
           .eq('status', 'subscribed')
-          .not('resend_synced_at', 'is', null)
+          // Also skips null: a change still waiting to go to Resend.
+          .lt('resend_synced_at', listedAtIso)
           .select('id');
         check(error);
         changed += data?.length ?? 0;

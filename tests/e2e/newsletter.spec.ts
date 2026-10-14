@@ -64,13 +64,14 @@ test.describe('Confirm page', () => {
     await expect(page).toHaveURL(/\/newsletter\/confirm\/$/);
   });
 
-  test('offers the form again when the link has expired', async ({ page }) => {
+  test('offers the form again when the link has expired or was already used', async ({ page }) => {
     await page.route('**/api/newsletter-confirm', (route) =>
       route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"expired"}' }),
     );
     await page.goto(`/newsletter/confirm/#t=${TOKEN}`);
     await page.getByRole('button', { name: 'Confirm my subscription' }).click();
-    await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'This link has expired or was already used', exact: true })).toBeVisible();
+    await expect(page.getByText("If you already confirmed, you're subscribed.")).toBeVisible();
     await expect(page.getByLabel('Email address')).toBeVisible();
   });
 

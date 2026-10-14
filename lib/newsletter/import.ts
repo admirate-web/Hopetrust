@@ -49,7 +49,9 @@ export function splitHeader(grid: unknown[][]): Sheet {
     .filter((row) => row.some((cell) => cell !== ''));
   if (cleaned.length === 0) return { headers: [], rows: [] };
 
-  const width = Math.max(...cleaned.map((row) => row.length));
+  // A loop, not Math.max(...rows): spreading 150,000 or so rows overflows the stack.
+  let width = 0;
+  for (const row of cleaned) width = Math.max(width, row.length);
   const pad = (row: string[]) => [...row, ...Array<string>(width - row.length).fill('')];
   const firstIsData = cleaned[0].some((cell) => isValidEmail(extractEmail(cell)));
   if (firstIsData) {

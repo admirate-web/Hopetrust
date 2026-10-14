@@ -14,6 +14,8 @@ interface NewsletterFormProps {
   className?: string;
   /** Light text, for dark backgrounds. */
   dark?: boolean;
+  /** Focus the name field when the form appears (the footer dialog, which loads the form on open). */
+  autoFocus?: boolean;
 }
 
 function check(values: { full_name: string; email: string }): Errors {
@@ -29,7 +31,12 @@ function check(values: { full_name: string; email: string }): Errors {
  * Newsletter sign-up (spec §7.1). Everyone who gets past validation sees the
  * same message, so the form never shows whether an address is on the list.
  */
-export default function NewsletterForm({ variant = 'card', className = '', dark = false }: NewsletterFormProps) {
+export default function NewsletterForm({
+  variant = 'card',
+  className = '',
+  dark = false,
+  autoFocus = false,
+}: NewsletterFormProps) {
   const id = useId();
   const [values, setValues] = useState({ full_name: '', email: '', website: '' });
   const [errors, setErrors] = useState<Errors>({});
@@ -109,6 +116,7 @@ export default function NewsletterForm({ variant = 'card', className = '', dark 
             name="full_name"
             type="text"
             autoComplete="name"
+            autoFocus={autoFocus}
             placeholder="Full name"
             value={values.full_name}
             onChange={update('full_name')}

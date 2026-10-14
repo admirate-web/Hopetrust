@@ -5,7 +5,7 @@ import { hashToken } from '@/netlify/functions/_shared/newsletter-crypto.mts';
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
 import { SIGNUP_RULES, handleSubscribe, linkOrigin } from '@/netlify/functions/_shared/newsletter-signup.mts';
 import { ResendError } from '@/netlify/functions/_shared/resend.mts';
-import { SITE, jsonRequest, makeDeps } from './fakes';
+import { SEGMENT, SITE, jsonRequest, makeDeps } from './fakes';
 
 const ENDPOINT = 'https://hopetrustindia.com/api/newsletter-subscribe';
 const MINUTE = 60_000;
@@ -240,6 +240,50 @@ describe('newsletter-subscribe', () => {
     expect(status).toBe(500);
     expect(body.error).toMatch(/try again/i);
     expect(sleeps).toEqual([2500]);
+  });
+
+  it('emails a subscribed address that unsubscribed on Resend\'s page since the last sync', async () => {
+    const { deps, memory, resend } = makeDeps();
+    const contact = resend.add('asha@example.com', { unsubscribed: true, segments: [SEGMENT] });
+    const row = memory.seed({
+      email: 'asha@example.com',
+      status: 'subscribed',
+      resend_contact_id: contact.id,
+      resend_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+
+    expect(await send(deps, signup())).toEqual({ status: 200, body: OK });
+    // The pull's rule, applied now: unsubscribed by Resend, until they confirm again.
+    expect(memory.get(row.id)).toMatchObject({
+      status: 'unsubscribed',
+      unsubscribe_source: 'resend',
+      unsubscribed_at: deps.now().toISOString(),
+      confirm_token_hash: hashToken(lastToken(resend.sent)),
+    });
+    expect(resend.sent.map((e) => e.to[0])).toEqual(['asha@example.com']);
+  });
+
+  it('leaves a subscribed address alone when Resend agrees, has a change waiting, or cannot be asked', async () => {
+    const { deps, memory, resend } = makeDeps();
+    const synced = '2026-10-01T00:00:00.000Z';
+    resend.add('on@example.com', { segments: [SEGMENT] });
+    memory.seed({ email: 'on@example.com', status: 'subscribed', resend_synced_at: synced });
+    // Just confirmed again, and the confirmation hasn't reached Resend yet: that is the newer word.
+    resend.add('waiting@example.com', { unsubscribed: true, segments: [SEGMENT] });
+    const waiting = memory.seed({ email: 'waiting@example.com', status: 'subscribed', resend_synced_at: null });
+    resend.add('unsure@example.com', { unsubscribed: true, segments: [SEGMENT] });
+    const unsure = memory.seed({ email: 'unsure@example.com', status: 'subscribed', resend_synced_at: synced });
+    quietErrors();
+
+    expect(await send(deps, signup({ email: 'on@example.com' }, '203.0.113.1'))).toEqual({ status: 200, body: OK });
+    expect(await send(deps, signup({ email: 'waiting@example.com' }, '203.0.113.2'))).toEqual({ status: 200, body: OK });
+    resend.failNext('getContact');
+    expect(await send(deps, signup({ email: 'unsure@example.com' }, '203.0.113.3'))).toEqual({ status: 200, body: OK });
+
+    expect(resend.sent).toHaveLength(0);
+    expect(memory.get(waiting.id)?.status).toBe('subscribed');
+    expect(memory.get(unsure.id)?.status).toBe('subscribed');
+    expect(resend.calls.filter((c) => c === 'getContact')).toHaveLength(3);
   });
 
   it('keeps an unsubscribed person unsubscribed, with their records, until they confirm', async () => {

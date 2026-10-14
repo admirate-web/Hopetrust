@@ -27,6 +27,14 @@ describe('splitHeader', () => {
   it('copes with an empty sheet', () => {
     expect(splitHeader([])).toEqual({ headers: [], rows: [] });
   });
+
+  it('copes with a sheet too long to spread into one function call', () => {
+    // About 2.8 MB as a CSV, inside the 5 MB limit.
+    const grid = [['Email'], ...Array.from({ length: 200_000 }, () => ['a@example.com'])];
+    const sheet = splitHeader(grid);
+    expect(sheet.headers).toEqual(['Email']);
+    expect(sheet.rows).toHaveLength(200_000);
+  });
 });
 
 describe('guessColumns', () => {

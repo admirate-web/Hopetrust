@@ -109,6 +109,26 @@ describe('ImportDialog', () => {
     await vi.waitFor(() => expect(props.onUnauthorized).toHaveBeenCalled());
   });
 
+  it('closes on Escape, but not while an import is running', async () => {
+    let finish: (result: unknown) => void = () => {};
+    mocks.importSubscribers.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    const props = setup();
+    await userEvent.keyboard('{Escape}');
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+
+    await upload(GRID);
+    await agree();
+    await userEvent.click(screen.getByRole('button', { name: 'Import 2 addresses' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Importing 2 of 2…');
+    await userEvent.keyboard('{Escape}');
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+
+    finish({ inserted: 2, skipped_existing: 0, skipped_erased: 0, invalid: 0, duplicates: 0 });
+    expect(await screen.findByText('Import finished')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(props.onClose).toHaveBeenCalledTimes(2);
+  });
+
   it('says when the file cannot be read', async () => {
     mocks.readSpreadsheet.mockRejectedValue(new Error('Choose a .csv or .xlsx file.'));
     setup();

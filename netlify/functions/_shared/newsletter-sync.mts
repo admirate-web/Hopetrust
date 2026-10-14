@@ -5,14 +5,17 @@
 //
 // Pull reads every contact in the segment, then:
 //   - rows unsubscribed on Resend's page become unsubscribed here, unless the
-//     row has a change waiting to go to Resend (that change is newer consent);
+//     row has a change waiting to go to Resend, or one that reached Resend
+//     after the list was read (that change is newer consent);
 //   - contacts subscribed in Resend but unsubscribed here get our unsubscribe again;
-//   - contacts with no consent on record (no row, or still pending) leave the segment.
+//   - contacts with no consent on record (no row, or still pending) leave the
+//     segment, and the contact of an erased person with no row is deleted.
 // Push sends rows whose resend_synced_at is null, oldest change first, until
 // the time budget runs out, and marks each one synced only if it hasn't
 // changed since it was read.
 
 import type { SubscriberRow } from '../../../lib/newsletter/subscriber';
+import { hashEmail } from './newsletter-crypto.mts';
 import type { SyncRow } from './newsletter-db.mts';
 import type { NewsletterDeps } from './newsletter-deps.mts';
 import { ResendError, type ResendClient, type ResendContact } from './resend.mts';
@@ -24,6 +27,8 @@ export interface PullPlan {
   repush: string[];
   /** Contact ids in the segment with no consent on record. */
   removeFromSegment: string[];
+  /** Contact ids of erased people with no row: Resend shouldn't keep the address at all. */
+  deleteContact: string[];
 }
 
 export type PushResult =
@@ -33,6 +38,7 @@ export type PushResult =
 
 export interface SyncReport {
   unsubscribedInResend: number;
+  /** Contacts with no consent on record taken out of the segment, or deleted for an erased person. */
   removedFromSegment: number;
   pushed: number;
   failed: number;
@@ -49,11 +55,16 @@ const PUSH_BATCH = 200;
 const MIN_TIME_PER_ROW_MS = 600;
 const MAX_ERRORS = 5;
 
-export function planPull(contacts: ResendContact[], rows: SyncRow[]): PullPlan {
+/** `erased`: hashes from newsletter_erased (hashEmail), for the contacts with no row. */
+export function planPull(contacts: ResendContact[], rows: SyncRow[], erased: Set<string> = new Set()): PullPlan {
   const byEmail = new Map(rows.map((r) => [r.email, r]));
-  const plan: PullPlan = { markUnsubscribed: [], repush: [], removeFromSegment: [] };
+  const plan: PullPlan = { markUnsubscribed: [], repush: [], removeFromSegment: [], deleteContact: [] };
   for (const contact of contacts) {
     const row = byEmail.get(contact.email.toLowerCase());
+    if (!row && erased.has(hashEmail(contact.email))) {
+      plan.deleteContact.push(contact.id);
+      continue;
+    }
     if (contact.unsubscribed) {
       if (row?.status === 'subscribed' && row.resend_synced_at !== null) plan.markUnsubscribed.push(row.id);
       continue;
@@ -84,9 +95,14 @@ export async function pushOne(deps: NewsletterDeps, row: SubscriberRow): Promise
   const { resend, config } = deps;
 
   if (row.status === 'unsubscribed') {
-    let found = row.resend_contact_id ? await resend.updateContact(row.resend_contact_id, { unsubscribed: true }) : false;
-    if (!found) found = await resend.updateContact(row.email, { unsubscribed: true });
-    return { kind: 'synced', contactId: found ? row.resend_contact_id : null };
+    if (row.resend_contact_id && (await resend.updateContact(row.resend_contact_id, { unsubscribed: true }))) {
+      return { kind: 'synced', contactId: row.resend_contact_id };
+    }
+    // No id, or a stale one: find the contact by address and keep its real id.
+    const contact = await resend.getContact(row.email);
+    if (!contact) return { kind: 'synced', contactId: null };
+    const updated = await resend.updateContact(contact.id, { unsubscribed: true });
+    return { kind: 'synced', contactId: updated ? contact.id : null };
   }
   if (row.status !== 'subscribed') throw new Error(`A ${row.status} row is never sent to Resend`);
 
@@ -100,6 +116,20 @@ export async function pushOne(deps: NewsletterDeps, row: SubscriberRow): Promise
   if (existing.unsubscribed) await resend.updateContact(existing.id, { unsubscribed: false });
   await ensureInSegment(resend, existing.id, config.segmentId);
   return { kind: 'synced', contactId: existing.id };
+}
+
+/**
+ * The pull's rule for one subscribed row, for a sign-up that can't wait for
+ * the next sync: if the contact unsubscribed on Resend's page, the row
+ * becomes unsubscribed now. Returns the row as it stands. Throws if Resend
+ * can't be asked.
+ */
+export async function pullOne(deps: NewsletterDeps, row: SubscriberRow): Promise<SubscriberRow> {
+  const listedAt = deps.now().toISOString();
+  const contact = await deps.resend.getContact(row.email);
+  if (!contact?.unsubscribed) return row;
+  const changed = await deps.db.markPulledUnsubscribed([row.id], deps.now().toISOString(), listedAt);
+  return changed > 0 ? ((await deps.db.findById(row.id)) ?? row) : row;
 }
 
 /** pushOne, then records the result on the row. Returns false if the row changed meanwhile. */
@@ -128,6 +158,8 @@ export async function runSync(deps: NewsletterDeps, opts: { pull: boolean; deadl
   };
 
   if (opts.pull) {
+    // Before the list: a row synced after this may be newer than what Resend says.
+    const listedAt = deps.now().toISOString();
     const contacts: ResendContact[] = [];
     let after: string | undefined;
     do {
@@ -136,8 +168,13 @@ export async function runSync(deps: NewsletterDeps, opts: { pull: boolean; deadl
       after = page.hasMore && page.contacts.length > 0 ? page.contacts[page.contacts.length - 1].id : undefined;
     } while (after);
 
-    const plan = planPull(contacts, await db.syncRows());
-    report.unsubscribedInResend = await db.markPulledUnsubscribed(plan.markUnsubscribed, deps.now().toISOString());
+    const rows = await db.syncRows();
+    const known = new Set(rows.map((r) => r.email));
+    const strangers = contacts.filter((c) => !known.has(c.email.toLowerCase()));
+    const erased = strangers.length > 0 ? await db.erasedHashes(strangers.map((c) => hashEmail(c.email))) : new Set<string>();
+    const plan = planPull(contacts, rows, erased);
+
+    report.unsubscribedInResend = await db.markPulledUnsubscribed(plan.markUnsubscribed, deps.now().toISOString(), listedAt);
     await db.markNeedsPush(plan.repush);
     for (const contactId of plan.removeFromSegment) {
       try {
@@ -145,6 +182,14 @@ export async function runSync(deps: NewsletterDeps, opts: { pull: boolean; deadl
         report.removedFromSegment++;
       } catch (err) {
         fail(`removing contact ${contactId} from the segment`, err);
+      }
+    }
+    for (const contactId of plan.deleteContact) {
+      try {
+        await resend.deleteContact(contactId);
+        report.removedFromSegment++;
+      } catch (err) {
+        fail(`deleting the contact of an erased person (${contactId})`, err);
       }
     }
   }
