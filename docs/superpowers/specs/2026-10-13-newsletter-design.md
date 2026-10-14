@@ -210,18 +210,18 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
 ### 7.2 `newsletter-subscribe`
 
 1. **Validate** with zod: name 2–200 characters; email valid, at most 254 characters, stored in lower case. The name and the page path may not contain control characters (`\u0000`–`\u001F`, `\u007F`–`\u009F`) or half of a surrogate pair: the database can't store `\u0000`, and no name needs the others. These get the normal "check the form" answer (400) before the address is looked up. Imports drop such a name and keep the row.
-2. **Honeypot.** If it's filled, return the normal success response and do nothing else.
-3. **Rate limit.** These limits stop the form being used to flood someone's inbox, or to use up the day's emails.
-   - **Per IP address:** confirmation emails for at most 5 addresses per 15 minutes. Over that, the form says to try again later (429). This limit describes the requester, not the address.
-   - **Whole site:** at most 40 confirmation emails an hour and 80 a day across all IP addresses, counted from `confirm_sent_at`. Resend's free plan sends 100 emails a day, so one sender can't stop sign-ups for everyone. Over that, the form says "We're getting a lot of sign-ups right now. Please try again later." (the same 429). It's checked straight after the per-IP limit and before the address is looked up, so it describes the site, not the address.
+2. **Honeypot.** If it's filled, return the normal success response, after the same wait as every other answer (step 6), and do nothing else.
+3. **Rate limit.** These limits stop the form being used to flood someone's inbox, to use up the day's emails, or to make endless Resend lookups. They count sign-up requests, not emails. Every request that passes the limits is logged in `newsletter_signup_requests` (§10.5), whatever address it names, and the limits count that log. So a request for a subscribed address counts the same as one for a new address, and neither the limits' answers nor their counts show who is on the list. Each counted request sends at most one email and makes at most one Resend lookup, so the limits bound both. A request over a limit isn't logged, so the windows empty once the traffic stops.
+   - **Per IP address:** at most 5 sign-up requests per 15 minutes. Over that, the form says to try again later (429). This limit describes the requester, not the address.
+   - **Whole site:** at most 40 sign-up requests an hour and 80 a day across all IP addresses. Resend's free plan sends 100 emails a day, so the form can't use them up. Over that, the form says "We're getting a lot of sign-ups right now. Please try again later." (the same 429). It's checked straight after the per-IP limit and before the address is looked up, so it describes the site, not the address. A flood of requests can fill it and pause sign-ups for everyone until the window empties, but it can't use up the day's emails.
    - **Per email address:** at least 10 minutes between confirmation emails, and at most 3 before the address confirms, counted over 30 days. Over these limits the answer is the normal success message and nothing is sent. A different answer would show that the address had signed up recently.
 4. **Act on the current status:**
    - New address: save as `pending` with a confirmation token, and send the confirmation email.
    - Pending: send the confirmation again, within the limits above.
    - Unsubscribed: keep the row `unsubscribed`, give it a new token and send the confirmation email. Only confirming re-subscribes them, and their unsubscribe record survives if they never confirm.
    - Subscribed: look the contact up in Resend. Someone who unsubscribed on Resend's page since the last sync still shows as subscribed here. If Resend says they're unsubscribed, apply the pull's rule (§9.3) to the row now (it becomes `unsubscribed`, with `unsubscribe_source = 'resend'`), then carry on as for an unsubscribed row, which sends the confirmation email. Otherwise, or if Resend can't be asked, do nothing.
-5. **Clean up.** Delete `pending` rows older than 30 days. They never gave consent, so there's no reason to keep their data. `unsubscribed` rows are never cleaned up this way. This also runs whenever the Subscribers screen loads its list or an export, so a quiet week doesn't keep the rows longer.
-6. **Same answer, same time.** After the limits, every outcome gets the same `200` "Check your inbox" answer: a failed save, a failed confirmation email, or any other error. Each failure is logged on the server. After a failed email the confirmation fields are put back, so an earlier link still works and the person can try again at once. Every answer after validation (the 200, the 429s, and the 500 if the limits themselves can't be checked) goes out 2.5 seconds after the request arrived. That's longer than saving and sending usually take, so the timing doesn't show whether an email was sent.
+5. **Clean up.** Delete `pending` rows older than 30 days. They never gave consent, so there's no reason to keep their data. `unsubscribed` rows are never cleaned up this way. This also runs whenever the Subscribers screen loads its list or an export, so a quiet week doesn't keep the rows longer. Each sign-up also deletes logged requests (step 3) older than a day.
+6. **Same answer, same time.** After the limits, every outcome gets the same `200` "Check your inbox" answer: a failed save, a failed confirmation email, or any other error. Each failure is logged on the server. After a failed email the confirmation fields are put back, so an earlier link still works and the person can try again at once. Once the body is read, every answer waits until 2.5 seconds after the request arrived: the honeypot's (step 2), the 200, the 429s, and the 500 if the limits or the request log can't be reached. That's longer than saving and sending usually take, so the timing doesn't show whether an email was sent. The one exception is a body that fails validation (400), which comes back at once: it never depends on the address, and the form checks the name and email the same way before sending.
 
 ### 7.3 Confirmation
 
@@ -446,8 +446,23 @@ create table newsletter_erased (
   - Uploads only through signed upload URLs issued by the admin function.
   - JPEG and PNG only, up to 5 MB.
 - **Row-level security:**
-  - Enabled on all three tables, with no `anon` policies. The functions use the service role.
+  - Enabled on all four tables (including §10.5's), with no `anon` policies. The functions use the service role.
   - The current `anon_insert_newsletter` policy goes away, because signups now go through the function.
+
+### 10.5 `newsletter_signup_requests` (new)
+
+```sql
+create table newsletter_signup_requests (
+  id            bigint generated always as identity primary key,
+  ip            text,         -- null when the request had no IP address
+  requested_at  timestamptz not null default now()
+);
+
+create index on newsletter_signup_requests (requested_at);
+create index on newsletter_signup_requests (ip, requested_at);
+```
+
+One row per sign-up request that passed the rate limits (§7.2 step 3), used for those limits only. It holds no email addresses, and the sign-up function deletes rows after a day. Only the functions read or write it (§10.4).
 
 ## 11. API
 
@@ -477,12 +492,14 @@ Every endpoint lives under `/api/*` and is redirected to `/.netlify/functions/*`
 - **Public endpoints:**
   - give the same response, in content and in timing, whatever the address's status and even when something fails, so nobody can find out whether an address is subscribed (§7.2);
   - use a honeypot, rate limits (per IP, site-wide and per address) and a request size limit;
+  - count every sign-up request in the per-IP and site-wide limits, whatever address it names, so the limits can't show who is on the list either (§7.2 step 3);
   - accept requests only from the site (CORS).
 - **Email HTML** is built only by the renderer, from the allowed content in §6.3. All text is escaped, and link and image URLs are checked.
 - **The preview iframe** is sandboxed (`srcdoc`, scripts disabled).
 - **Data:**
   - Only the minimum is kept: name, email and consent evidence.
   - Pending signups expire after 30 days.
+  - Sign-up requests are logged for the rate limits with only their IP address and time, for a day (§10.5).
   - Erased people are remembered only as a hash (§7.5).
   - The design PDF moves out of `public/`.
 

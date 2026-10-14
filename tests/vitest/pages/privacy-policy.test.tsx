@@ -23,6 +23,8 @@ describe('privacy policy', () => {
     expect(text).toMatch(/Resend/);
     expect(text).toMatch(/unsubscribe at any time/i);
     expect(text).toMatch(/30 days/);
+    // The sign-up rate limits keep each request's IP address for a day (spec §10.5).
+    expect(text).toMatch(/To stop abuse of the sign-up form, we keep the IP address of each sign-up request for 24 hours\./);
     expect(section!.querySelector('a[href="mailto:frontoffice@hopetrustindia.com"]')).not.toBeNull();
   });
 });

@@ -133,7 +133,8 @@ export default function PrivacyPolicyPage() {
                 <p>
                   You can unsubscribe at any time with the link at the bottom of every newsletter, or by replying
                   to it or calling us. If you don&apos;t confirm your sign-up, we delete your details after 30
-                  days. If you unsubscribe, we keep a record of that, so you aren&apos;t added back by mistake. To
+                  days. To stop abuse of the sign-up form, we keep the IP address of each sign-up request for 24
+                  hours. If you unsubscribe, we keep a record of that, so you aren&apos;t added back by mistake. To
                   have your details deleted completely, write to{' '}
                   <a href="mailto:frontoffice@hopetrustindia.com" className="text-[#ED7428] hover:underline">
                     frontoffice@hopetrustindia.com
