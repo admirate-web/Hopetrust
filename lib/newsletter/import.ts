@@ -2,7 +2,7 @@
 // import dialog uses it to preview a file; the subscribers function runs
 // cleanRows again on every row it receives.
 
-import { LIMITS, isValidEmail, normaliseEmail } from './subscriber';
+import { LIMITS, hasUnsafeCharacters, isValidEmail, normaliseEmail } from './subscriber';
 
 export interface ImportRow {
   email: string;
@@ -106,7 +106,8 @@ export function cleanRows(input: unknown): CleanedRows {
     seen.add(email);
     // Cut by characters, not UTF-16 units, so an emoji is never split in half.
     const name = typeof fields.name === 'string' ? Array.from(fields.name.trim()).slice(0, LIMITS.name).join('') : '';
-    rows.push({ email, name: name || null });
+    // A name the database can't store is dropped, like a name that isn't text.
+    rows.push({ email, name: name && !hasUnsafeCharacters(name) ? name : null });
   }
   return { rows, invalid, duplicates };
 }

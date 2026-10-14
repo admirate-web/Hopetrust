@@ -68,6 +68,21 @@ describe('cleanRows', () => {
     expect(row.name!.endsWith('🌿')).toBe(true);
   });
 
+  it('drops a name the database could not store, as it drops a name that is not text', () => {
+    const { rows } = cleanRows([
+      { email: 'a@example.com', name: 'Asha\u0000Rao' },
+      { email: 'b@example.com', name: 'Ravi \uD83C' },
+      { email: 'c@example.com', name: 'Meena\u0085' },
+      { email: 'd@example.com', name: 42 },
+    ]);
+    expect(rows).toEqual([
+      { email: 'a@example.com', name: null },
+      { email: 'b@example.com', name: null },
+      { email: 'c@example.com', name: null },
+      { email: 'd@example.com', name: null },
+    ]);
+  });
+
   it('counts anything that is not a row with a string email as invalid', () => {
     expect(cleanRows([{ email: 42 }, null, 'x', { name: 'No email' }])).toEqual({ rows: [], invalid: 4, duplicates: 0 });
     expect(cleanRows('not a list')).toEqual({ rows: [], invalid: 0, duplicates: 0 });

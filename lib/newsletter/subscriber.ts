@@ -82,18 +82,35 @@ export function isValidEmail(value: unknown): boolean {
   return emailSchema.safeParse(value).success;
 }
 
+/**
+ * A control character, or half of a UTF-16 surrogate pair. Postgres text
+ * can't hold \u0000, and no name needs the others. No lookbehind and no
+ * isWellFormed(): this also runs in the sign-up form, in older browsers.
+ */
+const UNSAFE_TEXT = /[\u0000-\u001F\u007F-\u009F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+export function hasUnsafeCharacters(text: string): boolean {
+  return UNSAFE_TEXT.test(text);
+}
+
 export const nameSchema = z
   .string({ required_error: 'Please enter your full name', invalid_type_error: 'Please enter your full name' })
   .trim()
   .min(2, 'Please enter your full name')
-  .max(LIMITS.name, 'Please use a shorter name');
+  .max(LIMITS.name, 'Please use a shorter name')
+  .refine((name) => !hasUnsafeCharacters(name), "Your name has a character we can't save. Please type it again.");
 
 /** The body the sign-up form posts to /api/newsletter-subscribe. */
 export const signupSchema = z.object({
   full_name: nameSchema,
   email: emailSchema,
-  /** Path of the page the form was on, e.g. "/blogs/". */
-  page: z.string().trim().max(LIMITS.page).regex(/^\/\S*$/).catch('/'),
+  /**
+   * Path of the page the form was on, e.g. "/blogs/". Anything that isn't a
+   * site path becomes "/", but unsafe characters are refused, not replaced.
+   */
+  page: z
+    .custom((page) => typeof page !== 'string' || !hasUnsafeCharacters(page), 'Please reload the page and try again.')
+    .pipe(z.string().trim().max(LIMITS.page).regex(/^\/\S*$/).catch('/')),
   notice: z.string().trim().max(20),
   /** Honeypot: hidden from people, so only bots fill it in. */
   website: z.string().max(500).optional(),

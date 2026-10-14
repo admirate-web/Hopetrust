@@ -58,6 +58,13 @@ function stripToken(row: SubscriberRow): AdminSubscriber {
   return rest;
 }
 
+/** Postgres text can't hold \u0000: PostgREST refuses the whole write (error 22P05). */
+function refuseNul(values: object): void {
+  for (const value of Object.values(values)) {
+    if (typeof value === 'string' && value.includes('\u0000')) throw new Error('unsupported Unicode escape sequence');
+  }
+}
+
 export function createMemoryDb(now: () => Date) {
   const rows = new Map<string, SubscriberRow>();
   const erased = new Set<string>();
@@ -78,6 +85,7 @@ export function createMemoryDb(now: () => Date) {
     (!f.q || `${r.email} ${r.full_name ?? ''}`.toLowerCase().includes(f.q.trim().toLowerCase()));
 
   function insertRow(row: NewSubscriber): SubscriberRow {
+    refuseNul(row);
     if (all().some((r) => r.email === row.email)) throw new DuplicateEmailError();
     const created = stamp();
     const full: SubscriberRow = { ...EMPTY, ...row, id: nextId(), created_at: created, updated_at: created };
@@ -102,6 +110,7 @@ export function createMemoryDb(now: () => Date) {
       return insertRow(row);
     },
     async update(id, patch, ifUpdatedAt) {
+      refuseNul(patch);
       const r = rows.get(id);
       if (!r || (ifUpdatedAt && r.updated_at !== ifUpdatedAt)) return null;
       const next = { ...r, ...patch, updated_at: stamp() };
@@ -110,6 +119,9 @@ export function createMemoryDb(now: () => Date) {
     },
     async countRecentFromIp(ip, sinceIso) {
       return all().filter((r) => r.signup_ip === ip && r.confirm_sent_at !== null && r.confirm_sent_at >= sinceIso).length;
+    },
+    async countConfirmationsSince(sinceIso) {
+      return all().filter((r) => r.confirm_sent_at !== null && r.confirm_sent_at >= sinceIso).length;
     },
     async deleteStalePending(beforeIso) {
       let deleted = 0;
@@ -351,6 +363,8 @@ export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
   const clock = createClock();
   const memory = createMemoryDb(clock.now);
   const resend = createFakeResend();
+  /** Every wait a handler asked for, in ms. The fake returns at once and leaves the clock alone. */
+  const sleeps: number[] = [];
   const deps: NewsletterDeps = {
     db: memory.db,
     resend: resend.client,
@@ -362,10 +376,13 @@ export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
       imagesBase: 'https://abc.supabase.co/storage/v1/object/public/newsletter-images',
     },
     now: clock.now,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
     verifyAdmin: (req) => (req.headers.get('authorization') === `Bearer ${ADMIN_TOKEN}` ? { email: ADMIN_EMAIL } : null),
     ...overrides,
   };
-  return { deps, clock, memory, resend };
+  return { deps, clock, memory, resend, sleeps };
 }
 
 export function jsonRequest(url: string, method: string, body?: unknown, headers: Record<string, string> = {}): Request {

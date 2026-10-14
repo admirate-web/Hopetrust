@@ -1,10 +1,52 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { verifyAdminToken } from '@/netlify/functions/_shared/admin.mts';
-import { DuplicateEmailError, chunked, searchPattern } from '@/netlify/functions/_shared/newsletter-db.mts';
+import {
+  DuplicateEmailError,
+  chunked,
+  createNewsletterDb,
+  searchPattern,
+} from '@/netlify/functions/_shared/newsletter-db.mts';
 import { liveDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
 import { SEGMENT, makeDeps } from './fakes';
+
+/** A Supabase client that answers every query with no rows and records the query-builder calls. */
+function recordingSupabase() {
+  const calls: unknown[][] = [];
+  const builder: object = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === 'then') return (resolve: (value: unknown) => void) => resolve({ data: [], error: null, count: 0 });
+        return (...args: unknown[]) => {
+          calls.push([prop, ...args]);
+          return builder;
+        };
+      },
+    },
+  );
+  const client = {
+    from(table: string) {
+      calls.push(['from', table]);
+      return builder;
+    },
+  };
+  return { db: createNewsletterDb(client as unknown as SupabaseClient), calls };
+}
+
+describe('createNewsletterDb queries', () => {
+  it('counts confirmation emails sent since a time, from every IP', async () => {
+    const { db, calls } = recordingSupabase();
+    await db.countConfirmationsSince('2026-10-14T09:00:00.000Z');
+    expect(calls).toEqual([
+      ['from', 'newsletter_subscribers'],
+      ['select', 'id', { count: 'exact', head: true }],
+      ['gte', 'confirm_sent_at', '2026-10-14T09:00:00.000Z'],
+    ]);
+  });
+});
 
 const SECRET = 'test-secret-that-is-long-enough!!';
 const withAuth = (token: string) =>
@@ -72,6 +114,22 @@ describe('liveDeps', () => {
       imagesBase: 'https://abc.supabase.co/storage/v1/object/public/newsletter-images',
     });
   });
+
+  it('sleeps on a real timer', async () => {
+    vi.useFakeTimers();
+    try {
+      let woke = false;
+      void liveDeps(env)!.sleep(2500).then(() => {
+        woke = true;
+      });
+      await vi.advanceTimersByTimeAsync(2499);
+      expect(woke).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(woke).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // The fakes stand in for Supabase and Resend in every handler test, so they
@@ -83,6 +141,25 @@ describe('test fakes', () => {
     await expect(deps.db.insert({ email: 'a@example.com', status: 'pending', source: 'website' })).rejects.toBeInstanceOf(
       DuplicateEmailError,
     );
+  });
+
+  it('refuse text containing \\u0000, as Postgres does', async () => {
+    const { deps } = makeDeps();
+    await expect(
+      deps.db.insert({ email: 'a@example.com', status: 'pending', source: 'website', full_name: 'Asha\u0000' }),
+    ).rejects.toThrow('unsupported Unicode escape sequence');
+    const row = await deps.db.insert({ email: 'a@example.com', status: 'pending', source: 'website' });
+    await expect(deps.db.update(row.id, { signup_page: '/blogs/\u0000' })).rejects.toThrow('unsupported Unicode escape sequence');
+    expect((await deps.db.findById(row.id))?.signup_page).toBeNull();
+  });
+
+  it('count recent confirmation emails across the site', async () => {
+    const { deps, memory } = makeDeps();
+    memory.seed({ email: 'a@example.com', status: 'pending', confirm_sent_at: '2026-10-14T09:30:00.000Z' });
+    memory.seed({ email: 'b@example.com', status: 'subscribed', confirm_sent_at: '2026-10-14T08:00:00.000Z' });
+    memory.seed({ email: 'c@example.com', status: 'subscribed' });
+    expect(await deps.db.countConfirmationsSince('2026-10-14T09:00:00.000Z')).toBe(1);
+    expect(await deps.db.countConfirmationsSince('2026-10-13T10:00:00.000Z')).toBe(2);
   });
 
   it('skip a guarded update when the row changed since it was read', async () => {

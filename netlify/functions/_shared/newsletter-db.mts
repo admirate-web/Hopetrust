@@ -42,6 +42,8 @@ export interface NewsletterDb {
   update(id: string, patch: SubscriberPatch, ifUpdatedAt?: string): Promise<SubscriberRow | null>;
   /** Rows whose latest confirmation email went out to a request from this IP since `sinceIso`. */
   countRecentFromIp(ip: string, sinceIso: string): Promise<number>;
+  /** Rows whose latest confirmation email went out since `sinceIso`, from any IP. */
+  countConfirmationsSince(sinceIso: string): Promise<number>;
   /** Deletes pending rows whose last confirmation email (or creation) is older than `beforeIso`. */
   deleteStalePending(beforeIso: string): Promise<number>;
   list(filters: SubscriberFilters, limit: number, offset: number): Promise<{ rows: AdminSubscriber[]; total: number }>;
@@ -165,6 +167,8 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
 
     countRecentFromIp: (ip, sinceIso) =>
       headCount((query) => query.eq('signup_ip', ip).gte('confirm_sent_at', sinceIso)),
+
+    countConfirmationsSince: (sinceIso) => headCount((query) => query.gte('confirm_sent_at', sinceIso)),
 
     async deleteStalePending(beforeIso) {
       const sent = await table().delete().eq('status', 'pending').lt('confirm_sent_at', beforeIso).select('id');

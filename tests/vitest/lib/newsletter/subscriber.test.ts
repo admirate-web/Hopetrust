@@ -3,6 +3,7 @@ import {
   KNOWN_NOTICE_VERSIONS,
   SIGNUP_NOTICE,
   isValidEmail,
+  nameSchema,
   normaliseEmail,
   signupSchema,
 } from '@/lib/newsletter/subscriber';
@@ -59,6 +60,37 @@ describe('signupSchema', () => {
   it('falls back to "/" for a page path that is not a site path', () => {
     expect(signupSchema.parse({ ...valid, page: 'javascript:alert(1)' }).page).toBe('/');
     expect(signupSchema.parse({ ...valid, page: undefined }).page).toBe('/');
+  });
+
+  // The database can't store \u0000, and no name needs control characters or
+  // half of a surrogate pair. Refusing them here keeps the server's answer
+  // the same for every address.
+  it.each([
+    ['NUL', 'Asha\u0000Rao'],
+    ['a tab', 'Asha\tRao'],
+    ['DEL', 'Asha\u007FRao'],
+    ['a C1 control character', 'Asha\u0085Rao'],
+    ['a lone high surrogate', 'Asha \uD83C'],
+    ['a lone low surrogate', '\uDF3F Asha'],
+    ['a high surrogate before a high surrogate', 'Asha \uD83C🌿'],
+  ])('refuses a name with %s', (_label, full_name) => {
+    const result = signupSchema.safeParse({ ...valid, full_name });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ['full_name'],
+      message: "Your name has a character we can't save. Please type it again.",
+    });
+    expect(nameSchema.safeParse(full_name).success).toBe(false);
+  });
+
+  it.each([
+    ['NUL', '/blogs/\u0000'],
+    ['a C1 control character', '/blogs/\u0085'],
+    ['a lone surrogate', '/blogs/\uD83C'],
+  ])('refuses a page path with %s instead of replacing it', (_label, page) => {
+    const result = signupSchema.safeParse({ ...valid, page });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ path: ['page'], message: 'Please reload the page and try again.' });
   });
 
   it('lets the honeypot field be left out', () => {

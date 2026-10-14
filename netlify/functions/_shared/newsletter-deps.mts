@@ -29,6 +29,8 @@ export interface NewsletterDeps {
   resend: ResendClient;
   config: NewsletterConfig;
   now: () => Date;
+  /** Waits; the sign-up answer uses it to take the same time for every address. */
+  sleep: (ms: number) => Promise<void>;
   verifyAdmin: (req: Request) => AdminUser | null;
 }
 
@@ -61,6 +63,7 @@ export function liveDeps(env: Record<string, string | undefined> = process.env):
       imagesBase: newsletterImagesBase(supabaseUrl),
     },
     now: () => new Date(),
+    sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
     verifyAdmin: (req) => verifyAdminToken(req, env.ADMIN_JWT_SECRET),
   };
 }

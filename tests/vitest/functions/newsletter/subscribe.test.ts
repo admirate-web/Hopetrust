@@ -1,15 +1,37 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { SIGNUP_SUCCESS_MESSAGE } from '@/lib/newsletter/subscriber';
 import { hashToken } from '@/netlify/functions/_shared/newsletter-crypto.mts';
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
-import { handleSubscribe, linkOrigin } from '@/netlify/functions/_shared/newsletter-signup.mts';
+import { SIGNUP_RULES, handleSubscribe, linkOrigin } from '@/netlify/functions/_shared/newsletter-signup.mts';
+import { ResendError } from '@/netlify/functions/_shared/resend.mts';
 import { SITE, jsonRequest, makeDeps } from './fakes';
 
 const ENDPOINT = 'https://hopetrustindia.com/api/newsletter-subscribe';
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 const OK = { ok: true, message: SIGNUP_SUCCESS_MESSAGE };
+const SITE_BUSY = "We're getting a lot of sign-ups right now. Please try again later.";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/** Hides the expected server-side error logs, and lets a test count them. */
+const quietErrors = () => vi.spyOn(console, 'error').mockImplementation(() => {});
+
+/** One address of each status, plus a new one, in the order the tests use them. */
+function seedEveryStatus(memory: ReturnType<typeof makeDeps>['memory'], now: Date) {
+  memory.seed({
+    email: 'pending@example.com',
+    status: 'pending',
+    confirm_sent_at: new Date(now.getTime() - 60 * MINUTE).toISOString(),
+    confirm_send_count: 1,
+  });
+  memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
+  memory.seed({ email: 'unsubscribed@example.com', status: 'unsubscribed' });
+  return ['new@example.com', 'pending@example.com', 'subscribed@example.com', 'unsubscribed@example.com'];
+}
 
 function signup(body: Record<string, unknown> = {}, ip = '203.0.113.7', url = ENDPOINT) {
   return jsonRequest(
@@ -55,6 +77,25 @@ describe('newsletter-subscribe', () => {
   it('refuses a notice version it does not know', async () => {
     const { deps } = makeDeps();
     expect((await send(deps, signup({ notice: '1999-01' }))).status).toBe(400);
+  });
+
+  // Postgres can't store \u0000, so these would fail at the write. They are
+  // refused before the address is looked up, so the answer can't depend on it.
+  it.each([
+    ['a NUL in the name', { full_name: 'Asha\u0000Rao' }, 'full_name'],
+    ['a NUL in the page', { page: '/blogs/\u0000' }, 'page'],
+    ['half of an emoji in the name', { full_name: 'Asha \uD83C' }, 'full_name'],
+  ])('refuses %s before looking the address up, and answers at once', async (_label, body, field) => {
+    const { deps, memory, resend, sleeps } = makeDeps();
+    memory.seed({ email: 'asha@example.com', status: 'subscribed' });
+    const findByEmail = vi.spyOn(deps.db, 'findByEmail');
+
+    const { status, body: answer } = await send(deps, signup(body));
+    expect(status).toBe(400);
+    expect(Object.keys(answer.fields)).toEqual([field]);
+    expect(findByEmail).not.toHaveBeenCalled();
+    expect(resend.calls).toEqual([]);
+    expect(sleeps).toEqual([]);
   });
 
   it('treats a filled honeypot as a bot: same answer, nothing saved or sent', async () => {
@@ -104,17 +145,101 @@ describe('newsletter-subscribe', () => {
 
   it('gives the same answer whatever the address\'s status', async () => {
     const { deps, memory, resend, clock } = makeDeps();
-    memory.seed({ email: 'pending@example.com', status: 'pending', confirm_sent_at: new Date(deps.now().getTime() - 60 * MINUTE).toISOString(), confirm_send_count: 1 });
-    memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
-    memory.seed({ email: 'unsubscribed@example.com', status: 'unsubscribed' });
+    const emails = seedEveryStatus(memory, deps.now());
 
     const answers = [];
-    for (const [i, email] of ['new@example.com', 'pending@example.com', 'subscribed@example.com', 'unsubscribed@example.com'].entries()) {
+    for (const [i, email] of emails.entries()) {
       clock.advance(MINUTE);
       answers.push(await send(deps, signup({ email }, `203.0.113.${i}`)));
     }
     for (const answer of answers) expect(answer).toEqual({ status: 200, body: OK });
     expect(resend.sent.map((e) => e.to[0])).toEqual(['new@example.com', 'pending@example.com', 'unsubscribed@example.com']);
+  });
+
+  it('gives the same answer whatever the address\'s status when saving fails', async () => {
+    const { deps, memory, resend } = makeDeps();
+    const emails = seedEveryStatus(memory, deps.now());
+    const errors = quietErrors();
+    const refuse = async (): Promise<never> => {
+      throw new Error('unsupported Unicode escape sequence');
+    };
+    const broken: NewsletterDeps = { ...deps, db: { ...deps.db, insert: refuse, update: refuse } };
+
+    const answers = [];
+    for (const [i, email] of emails.entries()) answers.push(await send(broken, signup({ email }, `203.0.113.${i}`)));
+    for (const answer of answers) expect(answer).toEqual({ status: 200, body: OK });
+    expect(resend.sent).toHaveLength(0);
+    // The three failed writes (new, pending, unsubscribed) are logged on the server.
+    expect(errors).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives the same answer whatever the address\'s status when the email cannot be sent', async () => {
+    const { deps, memory } = makeDeps();
+    const emails = seedEveryStatus(memory, deps.now());
+    const before = emails.map((email) => memory.byEmail(email));
+    const errors = quietErrors();
+    const broken: NewsletterDeps = {
+      ...deps,
+      resend: {
+        ...deps.resend,
+        sendEmail: async () => {
+          throw new ResendError(429, 'daily_quota_exceeded', 'You have reached your daily email sending quota');
+        },
+      },
+    };
+
+    const answers = [];
+    for (const [i, email] of emails.entries()) answers.push(await send(broken, signup({ email }, `203.0.113.${i}`)));
+    for (const answer of answers) expect(answer).toEqual({ status: 200, body: OK });
+    expect(errors).toHaveBeenCalledTimes(3);
+    // Nothing was sent, so the confirmation fields are back as they were.
+    for (const [i, email] of emails.entries()) {
+      const row = memory.byEmail(email);
+      expect(row?.confirm_token_hash ?? null).toBe(before[i]?.confirm_token_hash ?? null);
+      expect(row?.confirm_sent_at ?? null).toBe(before[i]?.confirm_sent_at ?? null);
+    }
+  });
+
+  it('answers after the same time whatever the address, counted from the start of the request', async () => {
+    const { deps, memory, clock, sleeps } = makeDeps();
+    memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
+    // Sending the confirmation email takes 400 ms; a subscribed address sends nothing.
+    const slowResend = {
+      ...deps.resend,
+      sendEmail: async (input: Parameters<NewsletterDeps['resend']['sendEmail']>[0]) => {
+        clock.advance(400);
+        return deps.resend.sendEmail(input);
+      },
+    };
+    const timed: NewsletterDeps = { ...deps, resend: slowResend };
+    const answeredAfter = async (email: string) => {
+      const start = clock.now().getTime();
+      expect(await send(timed, signup({ email }))).toEqual({ status: 200, body: OK });
+      return clock.now().getTime() - start + sleeps.at(-1)!;
+    };
+
+    expect(await answeredAfter('new@example.com')).toBe(SIGNUP_RULES.minAnswerMs);
+    expect(await answeredAfter('subscribed@example.com')).toBe(SIGNUP_RULES.minAnswerMs);
+    expect(sleeps).toEqual([SIGNUP_RULES.minAnswerMs - 400, SIGNUP_RULES.minAnswerMs]);
+    expect(SIGNUP_RULES.minAnswerMs).toBe(2500);
+  });
+
+  it('takes the same time over an error before the address is looked up', async () => {
+    const { deps, sleeps } = makeDeps();
+    quietErrors();
+    const broken: NewsletterDeps = {
+      ...deps,
+      db: {
+        ...deps.db,
+        countRecentFromIp: async () => {
+          throw new Error('Supabase is down');
+        },
+      },
+    };
+    const { status, body } = await send(broken, signup());
+    expect(status).toBe(500);
+    expect(body.error).toMatch(/try again/i);
+    expect(sleeps).toEqual([2500]);
   });
 
   it('keeps an unsubscribed person unsubscribed, with their records, until they confirm', async () => {
@@ -166,16 +291,50 @@ describe('newsletter-subscribe', () => {
   });
 
   it('limits each IP address to 5 addresses per 15 minutes', async () => {
-    const { deps, clock } = makeDeps();
+    const { deps, clock, sleeps } = makeDeps();
     for (let i = 0; i < 5; i++) {
       expect((await send(deps, signup({ email: `p${i}@example.com` }))).status).toBe(200);
     }
     const blocked = await send(deps, signup({ email: 'p5@example.com' }));
     expect(blocked.status).toBe(429);
     expect(blocked.body.error).toMatch(/try again/i);
+    expect(sleeps.at(-1)).toBe(2500);
     expect((await send(deps, signup({ email: 'p5@example.com' }, '198.51.100.1'))).status).toBe(200);
     clock.advance(16 * MINUTE);
     expect((await send(deps, signup({ email: 'p6@example.com' }))).status).toBe(200);
+  });
+
+  it('stops at 40 confirmation emails an hour across the whole site, whatever the address', async () => {
+    const { deps, memory, resend, clock, sleeps } = makeDeps();
+    const halfAnHourAgo = new Date(deps.now().getTime() - 30 * MINUTE).toISOString();
+    for (let i = 0; i < 40; i++) {
+      memory.seed({ email: `p${i}@example.com`, status: 'pending', signup_ip: `198.51.100.${i}`, confirm_sent_at: halfAnHourAgo });
+    }
+    memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
+
+    const forNew = await send(deps, signup({ email: 'new@example.com' }));
+    const forSubscribed = await send(deps, signup({ email: 'subscribed@example.com' }));
+    expect(forNew).toEqual({ status: 429, body: { error: SITE_BUSY } });
+    expect(forSubscribed).toEqual(forNew);
+    expect(sleeps).toEqual([2500, 2500]);
+    // Nothing sent, and nothing looked up in Resend.
+    expect(resend.calls).toEqual([]);
+    expect(memory.byEmail('new@example.com')).toBeUndefined();
+
+    clock.advance(31 * MINUTE);
+    expect(await send(deps, signup({ email: 'new@example.com' }))).toEqual({ status: 200, body: OK });
+    expect(resend.sent).toHaveLength(1);
+  });
+
+  it('stops at 80 confirmation emails a day across the whole site', async () => {
+    const { deps, memory, resend } = makeDeps();
+    const earlierToday = new Date(deps.now().getTime() - 3 * 60 * MINUTE).toISOString();
+    for (let i = 0; i < 79; i++) {
+      memory.seed({ email: `p${i}@example.com`, status: 'pending', signup_ip: `198.51.100.${i}`, confirm_sent_at: earlierToday });
+    }
+    expect(await send(deps, signup({ email: 'eightieth@example.com' }))).toEqual({ status: 200, body: OK });
+    expect(await send(deps, signup({ email: 'one-more@example.com' }))).toEqual({ status: 429, body: { error: SITE_BUSY } });
+    expect(resend.sent.map((e) => e.to[0])).toEqual(['eightieth@example.com']);
   });
 
   it('deletes sign-ups left unconfirmed for 30 days, but never unsubscribed rows', async () => {
@@ -203,8 +362,9 @@ describe('newsletter-subscribe', () => {
     const firstToken = lastToken(resend.sent);
     clock.advance(11 * MINUTE);
     resend.failNext('sendEmail');
+    quietErrors();
     const failed = await send(deps, signup());
-    expect(failed.status).toBe(502);
+    expect(failed).toEqual({ status: 200, body: OK });
     // The earlier link still works, and the person can try again straight away.
     expect(memory.byEmail('asha@example.com')).toMatchObject({ confirm_token_hash: hashToken(firstToken), confirm_send_count: 1 });
     expect((await send(deps, signup())).status).toBe(200);

@@ -1,7 +1,8 @@
 // The public steps of signing up (spec §7.2, §7.3):
 //   POST /api/newsletter-subscribe  { full_name, email, page, notice, website }
 //   POST /api/newsletter-confirm    { token }   (handleConfirm, added in Task 8)
-// Neither answer depends on whether the address is on the list.
+// Neither answer depends on whether the address is on the list: not its body,
+// not its status code, and not how long it takes.
 
 import { z } from 'zod';
 import { buildConfirmEmail } from '../../../lib/newsletter/confirm-email';
@@ -22,12 +23,18 @@ import { pushAndRecord } from './newsletter-sync.mts';
 const METHODS = 'POST, OPTIONS';
 const MAX_BODY_BYTES = 4096;
 const MINUTE = 60_000;
-const DAY = 24 * 60 * MINUTE;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 export const SIGNUP_RULES = {
+  /** Every answer after validation waits this long from the start, so its timing can't show whether the address is on the list. */
+  minAnswerMs: 2500,
   /** Different addresses that requests from one IP can trigger confirmation emails for, per window. */
   maxAddressesPerIp: 5,
   ipWindowMs: 15 * MINUTE,
+  /** Confirmation emails from the whole site, so no one sender can use up Resend's 100 emails a day. */
+  maxSiteSendsPerHour: 40,
+  maxSiteSendsPerDay: 80,
   /** Shortest gap between confirmation emails to one address. */
   resendGapMs: 10 * MINUTE,
   /** Confirmation emails one address can get without confirming, per 30 days. */
@@ -40,6 +47,8 @@ export const SIGNUP_RULES = {
 
 const OK = { ok: true, message: SIGNUP_SUCCESS_MESSAGE };
 export const EXPIRED = { error: 'expired', message: 'This link has expired or was already used.' };
+const IP_BUSY = { error: 'Too many sign-ups from your connection. Please try again in a few minutes.' };
+const SITE_BUSY = { error: "We're getting a lot of sign-ups right now. Please try again later." };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -98,6 +107,7 @@ export async function handleSubscribe(req: Request, deps: NewsletterDeps | null)
   if (req.method === 'OPTIONS') return preflight(METHODS);
   if (req.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
   if (!deps) return reply({ error: 'Server misconfiguration' }, 500);
+  const started = deps.now().getTime();
 
   const body = await readJsonBody(req, MAX_BODY_BYTES);
   if (!body.ok) return reply({ error: body.error }, body.status);
@@ -109,12 +119,16 @@ export async function handleSubscribe(req: Request, deps: NewsletterDeps | null)
     return reply({ error: 'Please reload the page and try again.' }, 400);
   }
 
+  let response: Response;
   try {
-    return await subscribe(req, deps, parsed.data, reply);
+    response = await subscribe(req, deps, parsed.data, reply);
   } catch (err) {
+    // Only the limits can fail this far out, and they don't depend on the address.
     console.error('[newsletter-subscribe]', err);
-    return reply({ error: 'Something went wrong. Please try again.' }, 500);
+    response = reply({ error: 'Something went wrong. Please try again.' }, 500);
   }
+  await deps.sleep(Math.max(0, started + SIGNUP_RULES.minAnswerMs - deps.now().getTime()));
+  return response;
 }
 
 async function subscribe(
@@ -123,7 +137,7 @@ async function subscribe(
   input: SignupInput,
   reply: (body: unknown, status?: number) => Response,
 ): Promise<Response> {
-  const { db, resend, config } = deps;
+  const { db } = deps;
   const now = deps.now().getTime();
   const ip = clientIp(req);
 
@@ -131,12 +145,38 @@ async function subscribe(
     .deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs))
     .catch((err) => console.error('[newsletter-subscribe] clean-up', err));
 
+  // The limits come before the address is looked up, so their answers can't depend on it.
   if (ip && (await db.countRecentFromIp(ip, iso(now - SIGNUP_RULES.ipWindowMs))) >= SIGNUP_RULES.maxAddressesPerIp) {
-    return reply({ error: 'Too many sign-ups from your connection. Please try again in a few minutes.' }, 429);
+    return reply(IP_BUSY, 429);
+  }
+  if (
+    (await db.countConfirmationsSince(iso(now - HOUR))) >= SIGNUP_RULES.maxSiteSendsPerHour ||
+    (await db.countConfirmationsSince(iso(now - DAY))) >= SIGNUP_RULES.maxSiteSendsPerDay
+  ) {
+    return reply(SITE_BUSY, 429);
   }
 
+  // From here on the answer is always the same. A different answer when
+  // something fails would show which addresses got far enough to fail.
+  try {
+    await sendConfirmation(req, deps, input, now, ip);
+  } catch (err) {
+    console.error('[newsletter-subscribe]', err);
+  }
+  return reply(OK);
+}
+
+/** Saves the request and emails a confirmation link, unless the rules say to skip. */
+async function sendConfirmation(
+  req: Request,
+  deps: NewsletterDeps,
+  input: SignupInput,
+  now: number,
+  ip: string | null,
+): Promise<void> {
+  const { db, resend, config } = deps;
   const existing = await db.findByEmail(input.email);
-  if (signupDecision(existing, new Date(now)) === 'skip') return reply(OK);
+  if (signupDecision(existing, new Date(now)) === 'skip') return;
 
   const token = newToken();
   const lastSent = existing?.confirm_sent_at ? Date.parse(existing.confirm_sent_at) : null;
@@ -159,10 +199,10 @@ async function subscribe(
       ? await db.update(existing.id, fields)
       : await db.insert({ email: input.email, status: 'pending', source: 'website', ...fields });
   } catch (err) {
-    if (err instanceof DuplicateEmailError) return reply(OK); // a request for the same address got there first
+    if (err instanceof DuplicateEmailError) return; // a request for the same address got there first
     throw err;
   }
-  if (!row) return reply(OK);
+  if (!row) return;
 
   const email = buildConfirmEmail({
     confirmUrl: `${linkOrigin(req, config.siteUrl)}/newsletter/confirm/#t=${token}`,
@@ -172,8 +212,9 @@ async function subscribe(
     await resend.sendEmail({ from: config.fromEmail, to: [input.email], replyTo: config.replyTo, ...email });
   } catch (err) {
     console.error('[newsletter-subscribe] confirmation email', err);
-    // Put the confirmation fields back: any earlier link keeps working and the
-    // person can try again at once.
+    // Put the confirmation fields back: any earlier link keeps working, the
+    // person can try again at once, and the failed send doesn't count
+    // towards the limits.
     await db
       .update(row.id, {
         confirm_token_hash: existing?.confirm_token_hash ?? null,
@@ -181,10 +222,8 @@ async function subscribe(
         confirm_sent_at: existing?.confirm_sent_at ?? null,
         confirm_send_count: existing?.confirm_send_count ?? 0,
       })
-      .catch(() => null);
-    return reply({ error: "We couldn't send the confirmation email. Please try again in a minute." }, 502);
+      .catch((undoErr) => console.error('[newsletter-subscribe] putting the confirmation fields back', undoErr));
   }
-  return reply(OK);
 }
 
 const confirmSchema = z.object({ token: z.string().regex(TOKEN_PATTERN) });
