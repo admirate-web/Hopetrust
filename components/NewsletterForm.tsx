@@ -1,225 +1,166 @@
 'use client';
 
-import { useState } from 'react';
-import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { useId, useState } from 'react';
+import Link from 'next/link';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import { SIGNUP_NOTICE, SIGNUP_SUCCESS_MESSAGE, emailSchema, nameSchema } from '@/lib/newsletter/subscriber';
 
-const schema = z.object({
-  full_name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email'),
-  phone: z
-    .string()
-    .min(10, 'Please enter a valid phone number')
-    .regex(/^[\d\s+\-()]+$/, 'Please enter a valid phone number'),
-});
-
-type FormData = z.infer<typeof schema>;
+type Field = 'full_name' | 'email';
+type Errors = Partial<Record<Field, string>>;
 
 interface NewsletterFormProps {
+  /** inline: one row (blog listing, homepage card). card: stacked (footer dialog, confirm page). */
   variant?: 'inline' | 'card';
   className?: string;
+  /** Light text, for dark backgrounds. */
   dark?: boolean;
 }
 
-export default function NewsletterForm({
-  variant = 'card',
-  className = '',
-  dark = false,
-}: NewsletterFormProps) {
-  const [form, setForm] = useState<FormData>({
-    full_name: '',
-    email: '',
-    phone: '',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+function check(values: { full_name: string; email: string }): Errors {
+  const errors: Errors = {};
+  const name = nameSchema.safeParse(values.full_name);
+  if (!name.success) errors.full_name = name.error.issues[0].message;
+  const email = emailSchema.safeParse(values.email);
+  if (!email.success) errors.email = email.error.issues[0].message;
+  return errors;
+}
 
-  const handleChange = (field: keyof FormData, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
+/**
+ * Newsletter sign-up (spec §7.1). Everyone who gets past validation sees the
+ * same message, so the form never shows whether an address is on the list.
+ */
+export default function NewsletterForm({ variant = 'card', className = '', dark = false }: NewsletterFormProps) {
+  const id = useId();
+  const [values, setValues] = useState({ full_name: '', email: '', website: '' });
+  const [errors, setErrors] = useState<Errors>({});
+  const [formError, setFormError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const update = (field: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValues((current) => ({ ...current, [field]: e.target.value }));
+    if (field !== 'website') setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrors({});
+    setFormError('');
+    const found = check(values);
+    setErrors(found);
+    if (found.full_name || found.email) return;
 
-    const result = schema.safeParse(form);
-    if (!result.success) {
-      const fieldErrors: Partial<Record<keyof FormData, string>> = {};
-      for (const issue of result.error.issues) {
-        const field = issue.path[0] as keyof FormData;
-        fieldErrors[field] = issue.message;
-      }
-      setErrors(fieldErrors);
-      return;
-    }
-
-    setLoading(true);
+    setSending(true);
     try {
-      const { error } = await supabase
-        .from('newsletter_subscribers')
-        .insert([result.data]);
-
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('You\'re already subscribed!');
-        } else {
-          toast.error('Something went wrong. Please try again.');
-        }
+      const res = await fetch('/api/newsletter-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: values.full_name,
+          email: values.email,
+          website: values.website,
+          page: window.location.pathname,
+          notice: SIGNUP_NOTICE.version,
+        }),
+      });
+      if (res.ok) {
+        setDone(true);
         return;
       }
-
-      setSuccess(true);
-      setForm({ full_name: '', email: '', phone: '' });
-      toast.success('Welcome aboard! You\'re now subscribed to our newsletter.');
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 400 && body.fields) {
+        setErrors(body.fields);
+        return;
+      }
+      setFormError(body.error || 'Something went wrong. Please try again.');
     } catch {
-      toast.error('Something went wrong. Please try again.');
+      setFormError("We couldn't reach the server. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      setSending(false);
     }
-  };
+  }
 
-  if (success) {
+  const text = dark ? 'text-white' : 'text-[#00373E]';
+  const muted = dark ? 'text-white/70' : 'text-[#00373E]/70';
+
+  if (done) {
     return (
-      <div className={`flex items-center gap-3 ${className}`}>
-        <CheckCircle2
-          className={`h-5 w-5 flex-shrink-0 ${dark ? 'text-emerald-400' : 'text-emerald-500'}`}
-        />
-        <p className={`text-sm font-medium ${dark ? 'text-white' : 'text-[#00373E]'}`}>
-          You&apos;re subscribed! Check your inbox soon.
-        </p>
+      <div role="status" className={`flex items-start gap-3 ${className}`}>
+        <CheckCircle2 aria-hidden="true" className={`mt-0.5 h-5 w-5 flex-shrink-0 ${dark ? 'text-emerald-300' : 'text-emerald-600'}`} />
+        <div>
+          <p className={`text-sm font-semibold ${text}`}>{SIGNUP_SUCCESS_MESSAGE}</p>
+          <p className={`mt-1 text-xs ${muted}`}>If it isn&apos;t there in a few minutes, look in your spam or promotions folder.</p>
+        </div>
       </div>
     );
   }
 
-  const inputBase = `w-full rounded-full text-sm outline-none transition-all placeholder:text-gray-400 ${
-    dark
-      ? 'bg-white/10 text-white border border-white/20 placeholder:text-white/40 focus:border-[#ED7428] focus:ring-1 focus:ring-[#ED7428]'
-      : 'bg-white text-gray-800 border border-gray-200 focus:border-[#ED7428] focus:ring-1 focus:ring-[#ED7428]'
-  }`;
-
-  if (variant === 'inline') {
-    return (
-      <form onSubmit={handleSubmit} className={`w-full ${className}`}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
-          <div className="flex-1">
-            <input
-              type="text"
-              id="nl-inline-name"
-              name="full_name"
-              placeholder="Full Name"
-              value={form.full_name}
-              onChange={(e) => handleChange('full_name', e.target.value)}
-              className={`${inputBase} px-4 py-2.5`}
-            />
-            {errors.full_name && (
-              <p className="mt-1 ml-3 text-[10px] text-red-400">{errors.full_name}</p>
-            )}
-          </div>
-          <div className="flex-1">
-            <input
-              type="email"
-              id="nl-inline-email"
-              name="email"
-              placeholder="Email Address"
-              value={form.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              className={`${inputBase} px-4 py-2.5`}
-            />
-            {errors.email && (
-              <p className="mt-1 ml-3 text-[10px] text-red-400">{errors.email}</p>
-            )}
-          </div>
-          <div className="flex-1">
-            <input
-              type="tel"
-              id="nl-inline-phone"
-              name="phone"
-              placeholder="Phone Number"
-              value={form.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
-              className={`${inputBase} px-4 py-2.5`}
-            />
-            {errors.phone && (
-              <p className="mt-1 ml-3 text-[10px] text-red-400">{errors.phone}</p>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-shrink-0 rounded-full bg-[#ED7428] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#d4631f] disabled:opacity-60"
-          >
-            {loading ? (
-              <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-            ) : (
-              'Subscribe'
-            )}
-          </button>
-        </div>
-      </form>
-    );
-  }
+  const input = `w-full rounded-full border text-sm outline-none transition focus:border-[#ED7428] focus:ring-1 focus:ring-[#ED7428] ${
+    dark ? 'border-white/20 bg-white/10 text-white placeholder:text-white/50' : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
+  } ${variant === 'inline' ? 'px-4 py-2.5' : 'px-5 py-3'}`;
+  const errorText = `ml-4 mt-1 text-xs ${dark ? 'text-red-200' : 'text-red-600'}`;
 
   return (
-    <form onSubmit={handleSubmit} className={`w-full space-y-3 ${className}`}>
-      <div>
-        <input
-          type="text"
-          id="nl-card-name"
-          name="full_name"
-          placeholder="Full Name"
-          value={form.full_name}
-          onChange={(e) => handleChange('full_name', e.target.value)}
-          className={`${inputBase} px-5 py-3`}
-        />
-        {errors.full_name && (
-          <p className="mt-1 ml-4 text-[11px] text-red-400">{errors.full_name}</p>
-        )}
+    <form onSubmit={handleSubmit} noValidate className={`relative w-full ${className}`}>
+      <div className={variant === 'inline' ? 'flex flex-col gap-2 sm:flex-row' : 'space-y-3'}>
+        <div className="flex-1">
+          <label htmlFor={`${id}-name`} className="sr-only">Full name</label>
+          <input
+            id={`${id}-name`}
+            name="full_name"
+            type="text"
+            autoComplete="name"
+            placeholder="Full name"
+            value={values.full_name}
+            onChange={update('full_name')}
+            aria-invalid={errors.full_name ? true : undefined}
+            aria-describedby={errors.full_name ? `${id}-name-error` : undefined}
+            className={input}
+          />
+          {errors.full_name && <p id={`${id}-name-error`} className={errorText}>{errors.full_name}</p>}
+        </div>
+        <div className="flex-1">
+          <label htmlFor={`${id}-email`} className="sr-only">Email address</label>
+          <input
+            id={`${id}-email`}
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="Email address"
+            value={values.email}
+            onChange={update('email')}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? `${id}-email-error` : undefined}
+            className={input}
+          />
+          {errors.email && <p id={`${id}-email-error`} className={errorText}>{errors.email}</p>}
+        </div>
+        {/* Bot trap: hidden from people and screen readers, so only bots fill it in. */}
+        <div aria-hidden="true" className="absolute -left-[9999px] top-0 h-px w-px overflow-hidden">
+          <label htmlFor={`${id}-website`}>Leave this empty</label>
+          <input id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" value={values.website} onChange={update('website')} />
+        </div>
+        <button
+          type="submit"
+          disabled={sending}
+          className={`flex-shrink-0 rounded-full bg-[#ED7428] text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#d4631f] disabled:opacity-60 ${
+            variant === 'inline' ? 'px-6 py-2.5' : 'w-full px-6 py-3'
+          }`}
+        >
+          {sending ? <Loader2 className="mx-auto h-4 w-4 animate-spin" aria-label="Sending" /> : 'Subscribe'}
+        </button>
       </div>
-      <div>
-        <input
-          type="email"
-          id="nl-card-email"
-          name="email"
-          placeholder="Email Address"
-          value={form.email}
-          onChange={(e) => handleChange('email', e.target.value)}
-          className={`${inputBase} px-5 py-3`}
-        />
-        {errors.email && (
-          <p className="mt-1 ml-4 text-[11px] text-red-400">{errors.email}</p>
-        )}
-      </div>
-      <div>
-        <input
-          type="tel"
-          id="nl-card-phone"
-          name="phone"
-          placeholder="Phone Number"
-          value={form.phone}
-          onChange={(e) => handleChange('phone', e.target.value)}
-          className={`${inputBase} px-5 py-3`}
-        />
-        {errors.phone && (
-          <p className="mt-1 ml-4 text-[11px] text-red-400">{errors.phone}</p>
-        )}
-      </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-full bg-[#ED7428] px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#d4631f] disabled:opacity-60"
-      >
-        {loading ? (
-          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-        ) : (
-          'Subscribe to Newsletter'
-        )}
-      </button>
+      {formError && (
+        <p role="alert" className={`mt-2 text-sm ${dark ? 'text-red-200' : 'text-red-600'}`}>
+          {formError}
+        </p>
+      )}
+      <p className={`mt-3 text-xs leading-relaxed ${muted}`}>
+        {SIGNUP_NOTICE.text}{' '}
+        <Link href="/privacy-policy/#newsletter" className="underline underline-offset-2 hover:text-[#ED7428]">
+          Privacy policy
+        </Link>
+      </p>
     </form>
   );
 }

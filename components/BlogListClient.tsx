@@ -6,8 +6,7 @@ import { Search, Calendar, ArrowRight, X } from 'lucide-react';
 import { Bricolage_Grotesque } from 'next/font/google';
 import FadeInSection from '@/components/FadeInSection';
 import ImageFallback from '@/components/ImageFallback';
-// NEWSLETTER DISABLED — uncomment when newsletter is enabled
-// import NewsletterForm from '@/components/NewsletterForm';
+import NewsletterForm from '@/components/NewsletterForm';
 import type { BlogPostMeta, CategoryInfo } from '@/lib/blog';
 
 const headingFont = Bricolage_Grotesque({
@@ -217,6 +216,23 @@ export default function BlogListClient({
           </section>
         </FadeInSection>
       )}
+
+      {/* Newsletter sign-up */}
+      <FadeInSection delay={150}>
+        <section className="w-full bg-[#00373E]">
+          <div className="mx-auto flex w-full max-w-[1225px] flex-col items-center gap-4 px-4 py-10 text-center sm:gap-6 sm:px-8 sm:py-14 lg:px-12">
+            <h2 className={`${headingFont.className} text-xl font-bold text-white sm:text-2xl lg:text-3xl`}>
+              Stay updated with our latest insights
+            </h2>
+            <p className="max-w-lg text-xs text-white/60 sm:text-sm">
+              A monthly letter from our team on mental health, therapy and recovery, straight to your inbox.
+            </p>
+            <div className="w-full max-w-2xl text-left">
+              <NewsletterForm variant="inline" dark />
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
 
       {/* Category filters + Grid */}
       <section ref={gridRef} className="w-full bg-[#F7F6F4] pt-8 pb-16 sm:py-10 lg:py-14">
