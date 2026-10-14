@@ -79,3 +79,40 @@ test.describe('Confirm page', () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
   });
 });
+
+test.describe('Admin newsletter tab', () => {
+  test('lists subscribers from the API', async ({ page }) => {
+    // The dashboard only reads the token's expiry; the mocked API accepts anything.
+    const payload = Buffer.from(
+      JSON.stringify({ email: 'admin@example.com', role: 'admin', exp: Math.floor(Date.now() / 1000) + 3600 }),
+    ).toString('base64');
+    await page.addInitScript((token) => {
+      sessionStorage.setItem('admin_token', token);
+      sessionStorage.setItem('admin_email', 'admin@example.com');
+    }, `e30.${payload}.signature`);
+    await page.route('**/api/admin-newsletter-subscribers**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          subscribers: [
+            {
+              id: 'a', email: 'asha@example.com', full_name: 'Asha Rao', status: 'subscribed', source: 'website',
+              consent_at: '2026-10-10T06:30:00.000Z', created_at: '2026-10-10T06:00:00.000Z',
+              unsubscribed_at: null, unsubscribe_source: null,
+            },
+          ],
+          total: 1,
+          counts: { pending: 0, subscribed: 1, unsubscribed: 0 },
+          needs_push: 0,
+          limit: 25,
+          offset: 0,
+        }),
+      }),
+    );
+    await page.goto('/arel-ops/');
+    await page.getByRole('button', { name: 'Newsletter' }).click();
+    await expect(page.getByRole('heading', { name: 'Newsletter subscribers' })).toBeVisible();
+    await expect(page.getByText('asha@example.com')).toBeVisible();
+  });
+});
