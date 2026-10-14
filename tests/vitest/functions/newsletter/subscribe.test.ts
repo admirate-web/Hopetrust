@@ -254,6 +254,41 @@ describe('newsletter-subscribe', () => {
     },
   );
 
+  // Netlify's functions are far from the database, so each round trip costs a
+  // lot of the floor. If emailing a new address ran past it, its answer would
+  // come later than a subscribed one's.
+  it('runs the clean-ups with the request log, then the three counts together, before the lookup', async () => {
+    const { deps } = makeDeps();
+    const events: string[] = [];
+    const traced =
+      <A extends unknown[], R>(name: string, fn: (...args: A) => Promise<R>) =>
+      async (...args: A): Promise<R> => {
+        events.push(`start ${name}`);
+        await Promise.resolve();
+        const result = await fn(...args);
+        events.push(`end ${name}`);
+        return result;
+      };
+    const { db } = deps;
+    const timed: NewsletterDeps = {
+      ...deps,
+      db: {
+        ...db,
+        deleteStalePending: traced('clean-up', db.deleteStalePending),
+        deleteRequestsBefore: traced('clean-up', db.deleteRequestsBefore),
+        recordRequest: traced('log', db.recordRequest),
+        countRequestsSince: traced('count', db.countRequestsSince),
+        findByEmail: traced('lookup', db.findByEmail),
+      },
+    };
+    expect(await send(timed, signup())).toEqual({ status: 200, body: OK });
+    expect(events).toEqual([
+      'start clean-up', 'start clean-up', 'start log', 'end clean-up', 'end clean-up', 'end log',
+      'start count', 'start count', 'start count', 'end count', 'end count', 'end count',
+      'start lookup', 'end lookup',
+    ]);
+  });
+
   it('emails a subscribed address that unsubscribed on Resend\'s page since the last sync', async () => {
     const { deps, memory, resend } = makeDeps();
     const contact = resend.add('asha@example.com', { unsubscribed: true, segments: [SEGMENT] });

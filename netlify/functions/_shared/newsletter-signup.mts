@@ -152,13 +152,6 @@ async function subscribe(
   const now = deps.now().getTime();
   const ip = clientIp(req);
 
-  await db
-    .deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs))
-    .catch((err) => console.error('[newsletter-subscribe] clean-up', err));
-  await db
-    .deleteRequestsBefore(iso(now - SIGNUP_RULES.requestLogLifetimeMs))
-    .catch((err) => console.error('[newsletter-subscribe] request log clean-up', err));
-
   // The limits count logged requests, not emails. Every request is logged
   // first and then counted, itself included, whatever address it names, and
   // all before the address is looked up: neither the answers nor the counts
@@ -166,7 +159,17 @@ async function subscribe(
   // together see one another, so a burst can't slip under a limit at once.
   // Each request that passes sends at most one email and makes at most one
   // Resend lookup, so the limits bound those too.
-  const requestId = await db.recordRequest(ip, iso(now));
+  // The clean-ups run alongside the logging, and the three counts together:
+  // the database is far from Netlify, and every answer must fit in the floor.
+  const [, , requestId] = await Promise.all([
+    db
+      .deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs))
+      .catch((err) => console.error('[newsletter-subscribe] clean-up', err)),
+    db
+      .deleteRequestsBefore(iso(now - SIGNUP_RULES.requestLogLifetimeMs))
+      .catch((err) => console.error('[newsletter-subscribe] request log clean-up', err)),
+    db.recordRequest(ip, iso(now)),
+  ]);
   const refuse = async (body: typeof IP_BUSY) => {
     // A refused request leaves the log, so the windows empty once the traffic
     // stops. If that fails, the row left behind only makes the limits stricter.
@@ -175,13 +178,13 @@ async function subscribe(
       .catch((err) => console.error('[newsletter-subscribe] removing a refused request', err));
     return reply(body, 429);
   };
-  if (ip && (await db.countRequestsSince(iso(now - SIGNUP_RULES.ipWindowMs), ip)) > SIGNUP_RULES.maxRequestsPerIp) {
-    return refuse(IP_BUSY);
-  }
-  if (
-    (await db.countRequestsSince(iso(now - HOUR))) > SIGNUP_RULES.maxSiteRequestsPerHour ||
-    (await db.countRequestsSince(iso(now - DAY))) > SIGNUP_RULES.maxSiteRequestsPerDay
-  ) {
+  const [fromIp, lastHour, lastDay] = await Promise.all([
+    ip ? db.countRequestsSince(iso(now - SIGNUP_RULES.ipWindowMs), ip) : 0,
+    db.countRequestsSince(iso(now - HOUR)),
+    db.countRequestsSince(iso(now - DAY)),
+  ]);
+  if (fromIp > SIGNUP_RULES.maxRequestsPerIp) return refuse(IP_BUSY);
+  if (lastHour > SIGNUP_RULES.maxSiteRequestsPerHour || lastDay > SIGNUP_RULES.maxSiteRequestsPerDay) {
     return refuse(SITE_BUSY);
   }
 
