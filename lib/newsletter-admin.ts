@@ -5,6 +5,7 @@
 
 import type { ImportRow } from '@/lib/newsletter/import';
 import type { AdminSubscriber, SubscriberSource, SubscriberStatus } from '@/lib/newsletter/subscriber';
+import type { IssueRow, IssueSummary } from '@/lib/newsletter/issue';
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -149,4 +150,116 @@ export async function syncUntilDone(
     if (r.remaining === 0 || r.pushed === 0) break;
   }
   return totals;
+}
+
+// =============================================================================
+// Issues: /api/admin-newsletter-issues (spec §8.1, §11)
+// =============================================================================
+
+/** An error from the issues API, with the issue as it now stands when the server sent it. */
+export class IssueApiError extends Error {
+  readonly status: number;
+  readonly issue: IssueRow | null;
+  readonly problems: string[];
+
+  constructor(message: string, status: number, issue: IssueRow | null, problems: string[]) {
+    super(message);
+    this.name = 'IssueApiError';
+    this.status = status;
+    this.issue = issue;
+    this.problems = problems;
+  }
+}
+
+/** Who is signed in, the sender, and how many people a send reaches. */
+export interface IssueContext {
+  me: string;
+  from: string;
+  subscribed: number;
+}
+
+export interface IssueList extends IssueContext {
+  issues: IssueSummary[];
+}
+
+export interface IssueDetail extends IssueContext {
+  issue: IssueRow;
+}
+
+export type IssueDraftInput = Pick<
+  IssueRow,
+  'subject' | 'preheader' | 'issue_date' | 'title' | 'hero_image_url' | 'hero_image_alt' | 'body' | 'share_url'
+>;
+
+export interface UploadTicket {
+  path: string;
+  token: string;
+  signed_url: string;
+  public_url: string;
+}
+
+async function issuesCall<T>(token: string, query: string, init: RequestInit = {}): Promise<T> {
+  // The literal path ends at "?", so tests/vitest/config/api-redirects.test.ts
+  // can check that netlify.toml routes it.
+  const res = await fetch(`/api/admin-newsletter-issues?${query}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
+    cache: 'no-store',
+  });
+  if (res.status === 401) throw new UnauthorizedError();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new IssueApiError(
+      body.error || `Request failed (${res.status})`,
+      res.status,
+      body.issue ?? null,
+      Array.isArray(body.problems) ? body.problems : [],
+    );
+  }
+  return body as T;
+}
+
+const post = (body?: unknown): RequestInit => (body === undefined ? { method: 'POST' } : { method: 'POST', body: JSON.stringify(body) });
+
+export function listIssues(token: string): Promise<IssueList> {
+  return issuesCall(token, '');
+}
+
+export function getIssue(token: string, id: string): Promise<IssueDetail> {
+  return issuesCall(token, queryString({ id }));
+}
+
+export async function createIssue(token: string): Promise<IssueRow> {
+  return (await issuesCall<{ issue: IssueRow }>(token, '', post())).issue;
+}
+
+/** Saves every field, guarded by the version the editor loaded (`updatedAt`). */
+export async function saveIssue(token: string, id: string, draft: IssueDraftInput, updatedAt: string): Promise<IssueRow> {
+  const body = await issuesCall<{ issue: IssueRow }>(token, queryString({ id }), {
+    method: 'PATCH',
+    body: JSON.stringify({ ...draft, updated_at: updatedAt }),
+  });
+  return body.issue;
+}
+
+export async function deleteIssue(token: string, id: string): Promise<void> {
+  await issuesCall(token, queryString({ id }), { method: 'DELETE' });
+}
+
+export function issueUploadUrl(token: string, id: string, contentType: 'image/jpeg' | 'image/png'): Promise<UploadTicket> {
+  return issuesCall(token, queryString({ id, action: 'upload-url' }), post({ content_type: contentType }));
+}
+
+/** Returns the addresses the test went to. */
+export async function sendTestIssue(token: string, id: string, to: string[]): Promise<string[]> {
+  return (await issuesCall<{ to: string[] }>(token, queryString({ id, action: 'test' }), post({ to }))).to;
+}
+
+/** Sends to every subscriber. `warning` is set when it went out but couldn't be recorded. */
+export function sendIssue(token: string, id: string): Promise<{ issue: IssueRow; warning?: string }> {
+  return issuesCall(token, queryString({ id, action: 'send' }), post());
+}
+
+export function checkIssue(token: string, id: string): Promise<{ issue: IssueRow; found: boolean }> {
+  return issuesCall(token, queryString({ id, action: 'check' }), post());
 }
