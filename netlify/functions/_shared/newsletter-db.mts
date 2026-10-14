@@ -27,6 +27,8 @@ export type SyncRow = Pick<
 export interface AuditEntry {
   action: string;
   actorEmail: string;
+  /** admin_audit_log.resource_type: a subscriber unless it says otherwise. */
+  resourceType?: 'newsletter_subscriber' | 'newsletter_issue';
   resourceId?: string | null;
   metadata?: Record<string, unknown>;
   ip?: string | null;
@@ -325,7 +327,7 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
         const { error } = await supabase.from('admin_audit_log').insert({
           action: entry.action,
           actor_email: entry.actorEmail,
-          resource_type: 'newsletter_subscriber',
+          resource_type: entry.resourceType ?? 'newsletter_subscriber',
           resource_id: entry.resourceId ?? null,
           metadata: entry.metadata ?? {},
           ip_address: entry.ip ?? null,

@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { newsletterImagesBase } from '../../../lib/newsletter/render';
 import { verifyAdminToken, type AdminUser } from './admin.mts';
 import { createNewsletterDb, type NewsletterDb } from './newsletter-db.mts';
+import { createImageStorage, createIssuesDb, type ImageStorage, type IssuesDb } from './newsletter-issues-db.mts';
 import { createResendClient, type ResendClient } from './resend.mts';
 
 /** The main site. Netlify sets URL for functions at runtime. */
@@ -26,6 +27,10 @@ export interface NewsletterConfig {
 
 export interface NewsletterDeps {
   db: NewsletterDb;
+  /** Newsletter issues (plan 3). */
+  issues: IssuesDb;
+  /** Signed upload URLs for the photos in an issue. */
+  images: ImageStorage;
   resend: ResendClient;
   config: NewsletterConfig;
   now: () => Date;
@@ -50,17 +55,19 @@ export function liveDeps(env: Record<string, string | undefined> = process.env):
     return null;
   }
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL as string;
+  const supabase = createClient(supabaseUrl, env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
+  const imagesBase = newsletterImagesBase(supabaseUrl);
   return {
-    db: createNewsletterDb(
-      createClient(supabaseUrl, env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } }),
-    ),
+    db: createNewsletterDb(supabase),
+    issues: createIssuesDb(supabase),
+    images: createImageStorage(supabase, imagesBase),
     resend: createResendClient({ apiKey: env.RESEND_API_KEY as string }),
     config: {
       segmentId: env.RESEND_NEWSLETTER_SEGMENT_ID as string,
       fromEmail: env.NEWSLETTER_FROM_EMAIL as string,
       replyTo: REPLY_TO,
       siteUrl: SITE_ORIGIN,
-      imagesBase: newsletterImagesBase(supabaseUrl),
+      imagesBase,
     },
     now: () => new Date(),
     sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),

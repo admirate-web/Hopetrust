@@ -12,12 +12,15 @@ import {
   type SubscriberFilters,
 } from '@/netlify/functions/_shared/newsletter-db.mts';
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
-import { ResendError, type EmailInput, type ResendClient } from '@/netlify/functions/_shared/resend.mts';
+import { ResendError, type BroadcastInput, type EmailInput, type ResendClient } from '@/netlify/functions/_shared/resend.mts';
+import type { IssueRow, IssueStatus, IssueSummary } from '@/lib/newsletter/issue';
+import type { ImageStorage, IssuesDb } from '@/netlify/functions/_shared/newsletter-issues-db.mts';
 
 export const SEGMENT = 'segment-newsletter';
 export const SITE = 'https://hopetrustindia.com';
 export const ADMIN_TOKEN = 'admin-token';
 export const ADMIN_EMAIL = 'admin@hopetrustindia.com';
+export const IMAGES_BASE = 'https://abc.supabase.co/storage/v1/object/public/newsletter-images';
 const START = Date.parse('2026-10-14T10:00:00.000Z');
 
 export function createClock(start = START) {
@@ -281,11 +284,23 @@ export interface FakeContact {
   segments: Set<string>;
 }
 
+export interface FakeBroadcast {
+  id: string;
+  name: string;
+  status: string;
+  sentAt: string | null;
+  /** What the handler sent, for broadcasts it created. */
+  input?: BroadcastInput;
+}
+
 export function createFakeResend() {
   const contacts = new Map<string, FakeContact>();
   const sent: EmailInput[] = [];
   const calls: string[] = [];
   const failures: Array<{ method: string; error: Error }> = [];
+  /** Newest first, as Resend lists them. */
+  const broadcasts: FakeBroadcast[] = [];
+  const lostReplies: Error[] = [];
   let ids = 0;
 
   const find = (key: string) =>
@@ -360,6 +375,23 @@ export function createFakeResend() {
       sent.push(input);
       return `email-${sent.length}`;
     },
+    async sendBroadcast(input) {
+      step('sendBroadcast');
+      const id = `broadcast-${broadcasts.length + 1}`;
+      broadcasts.unshift({ id, name: input.name, status: 'sent', sentAt: '2026-10-14T10:00:00.000Z', input });
+      // The broadcast went out, but the answer didn't arrive.
+      const lost = lostReplies.shift();
+      if (lost) throw lost;
+      return id;
+    },
+    async listBroadcasts(after) {
+      step('listBroadcasts');
+      const start = after ? broadcasts.findIndex((b) => b.id === after) + 1 : 0;
+      return {
+        broadcasts: broadcasts.slice(start, start + 100).map(({ id, name, status, sentAt }) => ({ id, name, status, sentAt })),
+        hasMore: start + 100 < broadcasts.length,
+      };
+    },
   };
 
   return {
@@ -369,6 +401,17 @@ export function createFakeResend() {
     calls,
     add,
     find,
+    broadcasts,
+    /** Adds a broadcast someone else made, newest first. */
+    addBroadcast(b: { name: string; status: string; sentAt?: string | null }): FakeBroadcast {
+      const added = { id: `broadcast-${broadcasts.length + 1}`, name: b.name, status: b.status, sentAt: b.sentAt ?? null };
+      broadcasts.unshift(added);
+      return added;
+    },
+    /** The next broadcast is sent, but the call throws `error`, as when Resend's answer is lost. */
+    loseNextReply(error: Error = new ResendError(500, 'application_error', 'Resend is down')) {
+      lostReplies.push(error);
+    },
     /** Makes the next call to `method` throw `error`. */
     failNext(method: keyof ResendClient, error: Error = new ResendError(500, 'application_error', 'Resend is down')) {
       failures.push({ method, error });
@@ -376,21 +419,165 @@ export function createFakeResend() {
   };
 }
 
+function clone<T>(value: T): T {
+  return structuredClone(value);
+}
+
+/** newsletter_issues in memory, with the real table's guards (Database/newsletter.sql §6). */
+export function createMemoryIssues(now: () => Date) {
+  const rows = new Map<string, IssueRow>();
+  let ids = 0;
+  let lastStamp = 0;
+  const stamp = () => {
+    lastStamp = Math.max(now().getTime(), lastStamp + 1);
+    return new Date(lastStamp).toISOString();
+  };
+  const nextId = () => `11111111-1111-4111-8111-${String(++ids).padStart(12, '0')}`;
+  const blank = {
+    last_error: null,
+    resend_broadcast_id: null,
+    recipient_count: null,
+    sent_at: null,
+    sent_by: null,
+  };
+
+  /** Changes a row only while it is in one of `from` (and unchanged since `ifUpdatedAt`), like the real update. */
+  function guarded(id: string, from: IssueStatus[], patch: Partial<IssueRow>, ifUpdatedAt?: string): IssueRow | null {
+    const row = rows.get(id);
+    if (!row || !from.includes(row.status) || (ifUpdatedAt !== undefined && row.updated_at !== ifUpdatedAt)) return null;
+    const next: IssueRow = { ...row, ...clone(patch), updated_at: stamp() };
+    rows.set(id, next);
+    return clone(next);
+  }
+
+  const summary = (r: IssueRow): IssueSummary => ({
+    id: r.id,
+    subject: r.subject,
+    issue_date: r.issue_date,
+    status: r.status,
+    recipient_count: r.recipient_count,
+    sent_at: r.sent_at,
+    last_error: r.last_error,
+    updated_at: r.updated_at,
+  });
+
+  const issues: IssuesDb = {
+    async list() {
+      return Array.from(rows.values())
+        .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))
+        .map(summary);
+    },
+    async get(id) {
+      const row = rows.get(id);
+      return row ? clone(row) : null;
+    },
+    async create(fields, actor) {
+      const at = stamp();
+      const row: IssueRow = {
+        ...clone(fields),
+        ...blank,
+        id: nextId(),
+        status: 'draft',
+        created_by: actor,
+        updated_by: actor,
+        created_at: at,
+        updated_at: at,
+      };
+      rows.set(row.id, row);
+      return clone(row);
+    },
+    async saveDraft(id, fields, actor, ifUpdatedAt) {
+      return guarded(id, ['draft'], { ...fields, updated_by: actor }, ifUpdatedAt);
+    },
+    async deleteDraft(id) {
+      if (rows.get(id)?.status !== 'draft') return false;
+      return rows.delete(id);
+    },
+    async lockForSend(id, actor) {
+      return guarded(id, ['draft'], { status: 'sending', sent_by: actor, last_error: null });
+    },
+    async markSent(id, fields) {
+      return guarded(id, ['sending', 'needs_check'], { ...fields, status: 'sent', last_error: null });
+    },
+    async backToDraft(id, error) {
+      return guarded(id, ['sending', 'needs_check'], { status: 'draft', sent_by: null, last_error: error });
+    },
+    async markNeedsCheck(id, error) {
+      return guarded(id, ['sending'], { status: 'needs_check', last_error: error });
+    },
+  };
+
+  return {
+    issues,
+    rows,
+    /** Puts an issue straight into the table, defaults filled in, for arranging a test. */
+    seed(fields: Partial<IssueRow> = {}): IssueRow {
+      const at = stamp();
+      const row: IssueRow = {
+        subject: '',
+        preheader: '',
+        issue_date: '2026-10-14',
+        title: '',
+        hero_image_url: null,
+        hero_image_alt: '',
+        body: { type: 'doc', content: [] },
+        share_url: null,
+        ...blank,
+        id: nextId(),
+        status: 'draft',
+        created_by: ADMIN_EMAIL,
+        updated_by: null,
+        created_at: at,
+        updated_at: at,
+        ...clone(fields),
+      };
+      rows.set(row.id, row);
+      return clone(row);
+    },
+    get(id: string): IssueRow | undefined {
+      const row = rows.get(id);
+      return row ? clone(row) : undefined;
+    },
+  };
+}
+
+/** Signed upload URLs that record the paths asked for. */
+export function createFakeImages(imagesBase: string) {
+  const paths: string[] = [];
+  const storage: ImageStorage = {
+    async createUploadUrl(path) {
+      paths.push(path);
+      const token = `token-${paths.length}`;
+      return {
+        path,
+        token,
+        signedUrl: `https://abc.supabase.co/storage/v1/object/upload/sign/newsletter-images/${path}?token=${token}`,
+        publicUrl: `${imagesBase}/${path}`,
+      };
+    },
+  };
+  return { storage, paths };
+}
+
 export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
   const clock = createClock();
   const memory = createMemoryDb(clock.now);
+  const issueStore = createMemoryIssues(clock.now);
+  const images = createFakeImages(IMAGES_BASE);
   const resend = createFakeResend();
   /** Every wait a handler asked for, in ms. The fake returns at once and leaves the clock alone. */
   const sleeps: number[] = [];
   const deps: NewsletterDeps = {
     db: memory.db,
+    issues: issueStore.issues,
+    images: images.storage,
     resend: resend.client,
     config: {
       segmentId: SEGMENT,
       fromEmail: 'Hope Trust <newsletter@hopetrustindia.com>',
       replyTo: 'frontoffice@hopetrustindia.com',
       siteUrl: SITE,
-      imagesBase: 'https://abc.supabase.co/storage/v1/object/public/newsletter-images',
+      imagesBase: IMAGES_BASE,
     },
     now: clock.now,
     sleep: async (ms) => {
@@ -399,7 +586,7 @@ export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
     verifyAdmin: (req) => (req.headers.get('authorization') === `Bearer ${ADMIN_TOKEN}` ? { email: ADMIN_EMAIL } : null),
     ...overrides,
   };
-  return { deps, clock, memory, resend, sleeps };
+  return { deps, clock, memory, issueStore, images, resend, sleeps };
 }
 
 export function jsonRequest(url: string, method: string, body?: unknown, headers: Record<string, string> = {}): Request {
