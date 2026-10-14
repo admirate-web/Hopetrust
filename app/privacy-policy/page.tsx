@@ -110,6 +110,39 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
             </div>
+
+            <div id="newsletter" className="scroll-mt-32">
+              <h2
+                className={`${headingFont.className} text-xl sm:text-2xl font-bold text-[#00373E] mb-4`}
+              >
+                Our newsletter
+              </h2>
+              <div className={`${bodyFont.className} space-y-4 text-[#00373E]/80 text-base sm:text-lg`}>
+                <p>
+                  If you sign up for the Hope Trust newsletter, we keep your name and email address and a record
+                  of how you agreed: when you confirmed by clicking the link we emailed you, the page you signed
+                  up on, your IP address and browser at the time, and which version of the sign-up notice you saw.
+                  If we add you from a list you agreed to be on, such as a form at our clinic, we keep a note of
+                  where and when you agreed instead.
+                </p>
+                <p>
+                  We use these details only to send you the newsletter, about once a month, and to show that you
+                  asked for it. Our email service, Resend, which is based in the United States, sends the
+                  newsletter for us and stores your email address for that purpose.
+                </p>
+                <p>
+                  You can unsubscribe at any time with the link at the bottom of every newsletter, or by replying
+                  to it or calling us. If you don&apos;t confirm your sign-up, we delete your details after 30
+                  days. If you unsubscribe, we keep a record of that, so you aren&apos;t added back by mistake. To
+                  have your details deleted completely, write to{' '}
+                  <a href="mailto:frontoffice@hopetrustindia.com" className="text-[#ED7428] hover:underline">
+                    frontoffice@hopetrustindia.com
+                  </a>
+                  . After that we keep only a scrambled fingerprint of your address (a one-way hash), so an old
+                  list can&apos;t add you back.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
