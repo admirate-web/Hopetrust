@@ -205,21 +205,23 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
   - **Footer:** the "Subscribe to our newsletter" button opens the form in a small dialog.
   - **Blog listing:** the existing call-out, switched back on.
   - **Homepage card:** `LargeRectangleSection`, switched back on. Its sentence "Connect with others, share experiences, and find encouragement in a safe, supportive space" describes a community rather than a newsletter. Proposed replacement, which Hope Trust can change: "A monthly letter from our team, with ideas you can use between sessions. Unsubscribe any time."
-- **Same message for everyone.** After submitting, everyone sees "Check your inbox to confirm your subscription", whether the address is new, pending, already subscribed or previously unsubscribed. The current form says "You're already subscribed!", which tells anyone whether an address is on a mental-health mailing list.
+- **Same message for everyone.** After submitting, everyone sees "Check your inbox to confirm your subscription", whether the address is new, pending, already subscribed or previously unsubscribed. That holds even when something fails on our side, and the answer takes the same time for every address (§7.2). The current form says "You're already subscribed!", which tells anyone whether an address is on a mental-health mailing list.
 
 ### 7.2 `newsletter-subscribe`
 
-1. **Validate** with zod: name 2–200 characters; email valid, at most 254 characters, stored in lower case.
+1. **Validate** with zod: name 2–200 characters; email valid, at most 254 characters, stored in lower case. The name and the page path may not contain control characters (`\u0000`–`\u001F`, `\u007F`–`\u009F`) or half of a surrogate pair: the database can't store `\u0000`, and no name needs the others. These get the normal "check the form" answer (400) before the address is looked up. Imports drop such a name and keep the row.
 2. **Honeypot.** If it's filled, return the normal success response and do nothing else.
-3. **Rate limit.** These limits stop the form being used to flood someone's inbox.
+3. **Rate limit.** These limits stop the form being used to flood someone's inbox, or to use up the day's emails.
    - **Per IP address:** confirmation emails for at most 5 addresses per 15 minutes. Over that, the form says to try again later (429). This limit describes the requester, not the address.
+   - **Whole site:** at most 40 confirmation emails an hour and 80 a day across all IP addresses, counted from `confirm_sent_at`. Resend's free plan sends 100 emails a day, so one sender can't stop sign-ups for everyone. Over that, the form says "We're getting a lot of sign-ups right now. Please try again later." (the same 429). It's checked straight after the per-IP limit and before the address is looked up, so it describes the site, not the address.
    - **Per email address:** at least 10 minutes between confirmation emails, and at most 3 before the address confirms, counted over 30 days. Over these limits the answer is the normal success message and nothing is sent. A different answer would show that the address had signed up recently.
 4. **Act on the current status:**
    - New address: save as `pending` with a confirmation token, and send the confirmation email.
    - Pending: send the confirmation again, within the limits above.
    - Unsubscribed: keep the row `unsubscribed`, give it a new token and send the confirmation email. Only confirming re-subscribes them, and their unsubscribe record survives if they never confirm.
-   - Subscribed: do nothing.
-5. **Clean up.** Delete `pending` rows older than 30 days. They never gave consent, so there's no reason to keep their data. `unsubscribed` rows are never cleaned up this way.
+   - Subscribed: look the contact up in Resend. Someone who unsubscribed on Resend's page since the last sync still shows as subscribed here. If Resend says they're unsubscribed, apply the pull's rule (§9.3) to the row now (it becomes `unsubscribed`, with `unsubscribe_source = 'resend'`), then carry on as for an unsubscribed row, which sends the confirmation email. Otherwise, or if Resend can't be asked, do nothing.
+5. **Clean up.** Delete `pending` rows older than 30 days. They never gave consent, so there's no reason to keep their data. `unsubscribed` rows are never cleaned up this way. This also runs whenever the Subscribers screen loads its list or an export, so a quiet week doesn't keep the rows longer.
+6. **Same answer, same time.** After the limits, every outcome gets the same `200` "Check your inbox" answer: a failed save, a failed confirmation email, or any other error. Each failure is logged on the server. After a failed email the confirmation fields are put back, so an earlier link still works and the person can try again at once. Every answer after validation (the 200, the 429s, and the 500 if the limits themselves can't be checked) goes out 2.5 seconds after the request arrived. That's longer than saving and sending usually take, so the timing doesn't show whether an email was sent.
 
 ### 7.3 Confirmation
 
@@ -235,7 +237,7 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
     1. sets the row to `subscribed` with `source = 'website'`, `consent_at` set to now and a `consent_note` naming the page and notice version, and clears `unsubscribed_at` and `unsubscribe_source`;
     2. clears the token, and removes the address's hash from `newsletter_erased` if it's there (§7.5);
     3. marks the row for Resend sync and tries to push it to Resend straight away. If that fails, the next sync retries.
-  - If the token is invalid or expired, the page offers to sign up again.
+  - If the token is invalid or expired, the page offers to sign up again. A used link looks the same, so the page says "This link has expired or was already used" and "If you already confirmed, you're subscribed."
 - **Page style:** a simple branded page with the site header, footer and Bricolage type. It isn't a landing page.
 - **Not indexed:** the page is `noindex`, and `newsletter` is added to the `UNLISTED` set in `scripts/generate-sitemap.mjs`.
 
@@ -325,9 +327,9 @@ The function renders the saved issue in test mode and sends it through Resend's 
 ### 9.3 Sync
 
 1. **Pull.** List the contacts in the Newsletter segment, 100 per page.
-   - **Unsubscribed in Resend, `subscribed` here:** the row becomes `unsubscribed`, with `unsubscribe_source = 'resend'`. The exception is a row with a change still waiting to go to Resend: that change is newer consent, such as a confirmation, so the row is left alone.
+   - **Unsubscribed in Resend, `subscribed` here:** the row becomes `unsubscribed`, with `unsubscribe_source = 'resend'`. The exception is a row with a change still waiting to go to Resend, or one that reached Resend after the list was read: that change is newer consent, such as a confirmation, so the row is left alone.
    - **Subscribed in Resend, `unsubscribed` here:** the unsubscribe is pushed again.
-   - **In the segment with no consent on record** (no row, or a pending one): the contact is removed from the segment.
+   - **In the segment with no consent on record** (no row, or a pending one): the contact is removed from the segment. If there's no row and the address is on the erasure list (§7.5), the contact is deleted instead.
 2. **Push.** Take rows where `resend_synced_at is null`, oldest change first, for about 7 seconds per call. Resend allows 10 requests a second, and Netlify may stop a function after 10 seconds. For each row:
    - **Subscribed:** look the contact up by email.
      - If there is none, create it straight into the segment.
@@ -473,8 +475,8 @@ Every endpoint lives under `/api/*` and is redirected to `/.netlify/functions/*`
 
 - **Admin endpoints** check the JWT the same way `admin-enrollments` does. Every send, test send, import, export, unsubscribe and delete is written to `admin_audit_log`.
 - **Public endpoints:**
-  - give the same response whatever the address's status, so nobody can find out whether an address is subscribed;
-  - use a honeypot, rate limits and a request size limit;
+  - give the same response, in content and in timing, whatever the address's status and even when something fails, so nobody can find out whether an address is subscribed (§7.2);
+  - use a honeypot, rate limits (per IP, site-wide and per address) and a request size limit;
   - accept requests only from the site (CORS).
 - **Email HTML** is built only by the renderer, from the allowed content in §6.3. All text is escaped, and link and image URLs are checked.
 - **The preview iframe** is sandboxed (`srcdoc`, scripts disabled).
