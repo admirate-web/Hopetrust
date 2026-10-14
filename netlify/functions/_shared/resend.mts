@@ -38,6 +38,28 @@ export interface EmailInput {
   replyTo?: string;
 }
 
+export interface BroadcastInput {
+  segmentId: string;
+  from: string;
+  replyTo?: string;
+  subject: string;
+  html: string;
+  /** Resend's own label; the newsletter puts the issue id in it, so Check status can find it (spec §9.1). */
+  name: string;
+}
+
+export interface BroadcastSummary {
+  id: string;
+  name: string;
+  status: string;
+  sentAt: string | null;
+}
+
+export interface BroadcastPage {
+  broadcasts: BroadcastSummary[];
+  hasMore: boolean;
+}
+
 export interface ResendClient {
   getContact(idOrEmail: string): Promise<ResendContact | null>;
   createContact(email: string, segmentId: string): Promise<string>;
@@ -48,6 +70,10 @@ export interface ResendClient {
   contactSegmentIds(contactId: string): Promise<string[]>;
   listSegmentContacts(segmentId: string, after?: string): Promise<ContactPage>;
   sendEmail(input: EmailInput): Promise<string>;
+  /** Creates a broadcast to the segment and sends it at once. Returns its id. */
+  sendBroadcast(input: BroadcastInput): Promise<string>;
+  /** One page of broadcasts, as Resend lists them. */
+  listBroadcasts(after?: string): Promise<BroadcastPage>;
 }
 
 export interface ResendClientOptions {
@@ -58,6 +84,12 @@ export interface ResendClientOptions {
   sleep?: (ms: number) => Promise<void>;
   clock?: () => number;
   baseUrl?: string;
+  /**
+   * Gives up on creating a broadcast after this long (default 4 s), so the
+   * function can still record that the outcome is unclear before Netlify
+   * stops it.
+   */
+  broadcastTimeoutMs?: number;
 }
 
 const MAX_RETRY_WAIT_MS = 2000;
@@ -89,7 +121,13 @@ export function createResendClient(options: ResendClientOptions): ResendClient {
     if (wait > 0) await sleep(wait);
   }
 
-  async function request(method: string, path: string, body?: unknown, retried = false): Promise<Json | null> {
+  async function request(
+    method: string,
+    path: string,
+    body?: unknown,
+    retried = false,
+    timeoutMs?: number,
+  ): Promise<Json | null> {
     await pace();
     const res = await doFetch(`${base}${path}`, {
       method,
@@ -98,11 +136,12 @@ export function createResendClient(options: ResendClientOptions): ResendClient {
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
     });
     if (res.status === 429 && !retried) {
       const seconds = Number(res.headers.get('retry-after'));
       await sleep(Math.min(Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 1000, MAX_RETRY_WAIT_MS));
-      return request(method, path, body, true);
+      return request(method, path, body, true, timeoutMs);
     }
     const text = await res.text();
     let data: Json | null = null;
@@ -178,16 +217,17 @@ export function createResendClient(options: ResendClientOptions): ResendClient {
     },
 
     async contactSegmentIds(contactId) {
-      const page = await request('GET', `/contacts/${contactKey(contactId)}/segments?limit=100`);
-      return Array.isArray(page?.data) ? page.data.map((s: Json) => String(s.id)) : [];
+      const data = (await request('GET', `/contacts/${contactKey(contactId)}/segments?limit=100`))?.data;
+      return Array.isArray(data) ? data.map((s: Json) => String(s.id)) : [];
     },
 
     async listSegmentContacts(segmentId, after) {
       const query = new URLSearchParams({ segment_id: segmentId, limit: '100' });
       if (after) query.set('after', after);
       const page = await request('GET', `/contacts?${query}`);
+      const data = page?.data;
       return {
-        contacts: Array.isArray(page?.data) ? page.data.map(toContact) : [],
+        contacts: Array.isArray(data) ? data.map(toContact) : [],
         hasMore: Boolean(page?.has_more),
       };
     },
@@ -202,6 +242,42 @@ export function createResendClient(options: ResendClientOptions): ResendClient {
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
       });
       return String(sent?.id ?? '');
+    },
+
+    async sendBroadcast(input) {
+      const created = await request(
+        'POST',
+        '/broadcasts',
+        {
+          segment_id: input.segmentId,
+          from: input.from,
+          subject: input.subject,
+          html: input.html,
+          name: input.name,
+          send: true,
+          ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+        },
+        false,
+        options.broadcastTimeoutMs ?? 4000,
+      );
+      if (typeof created?.id !== 'string') throw new ResendError(502, 'bad_response', 'Resend did not return a broadcast id');
+      return created.id;
+    },
+
+    async listBroadcasts(after) {
+      const query = new URLSearchParams({ limit: '100' });
+      if (after) query.set('after', after);
+      const page = await request('GET', `/broadcasts?${query}`);
+      const data = page?.data;
+      return {
+        broadcasts: (Array.isArray(data) ? data : []).map((b: Json) => ({
+          id: String(b.id),
+          name: String(b.name ?? ''),
+          status: String(b.status ?? ''),
+          sentAt: typeof b.sent_at === 'string' ? b.sent_at : null,
+        })),
+        hasMore: Boolean(page?.has_more),
+      };
     },
   };
 }

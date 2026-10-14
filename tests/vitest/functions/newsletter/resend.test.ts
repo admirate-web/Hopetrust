@@ -184,3 +184,83 @@ describe('createResendClient', () => {
     expect(sleeps).toEqual([110, 110]);
   });
 });
+
+describe('broadcasts', () => {
+  const input = {
+    segmentId: 'seg',
+    from: 'Hope Trust <newsletter@hopetrustindia.com>',
+    replyTo: 'frontoffice@hopetrustindia.com',
+    subject: 'Hello',
+    html: '<p>Hi</p>',
+    name: 'Hello [issue x]',
+  };
+
+  it('creates the broadcast and sends it in one call', async () => {
+    const { resend, calls } = client([{ status: 200, body: { object: 'broadcast', id: 'b-1' } }]);
+    expect(await resend.sendBroadcast(input)).toBe('b-1');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe('https://api.resend.com/broadcasts');
+    expect(calls[0].body).toEqual({
+      segment_id: 'seg',
+      from: 'Hope Trust <newsletter@hopetrustindia.com>',
+      subject: 'Hello',
+      html: '<p>Hi</p>',
+      name: 'Hello [issue x]',
+      send: true,
+      reply_to: 'frontoffice@hopetrustindia.com',
+    });
+  });
+
+  it('treats an answer without an id as a server error', async () => {
+    const { resend } = client([{ status: 200, body: {} }]);
+    await expect(resend.sendBroadcast(input)).rejects.toMatchObject({ status: 502 });
+  });
+
+  it('passes on a refusal with its status', async () => {
+    const { resend } = client([{ status: 422, body: { name: 'validation_error', message: 'Bad from' } }]);
+    await expect(resend.sendBroadcast(input)).rejects.toMatchObject({ status: 422, message: 'Bad from' });
+  });
+
+  it('gives up on a broadcast that takes too long, so the send can be checked later', async () => {
+    let signal: AbortSignal | null | undefined;
+    const slowFetch = (_url: string, init: RequestInit) => {
+      signal = init.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    };
+    const resend = createResendClient({
+      apiKey: 're_test',
+      minIntervalMs: 0,
+      broadcastTimeoutMs: 20,
+      fetch: slowFetch as unknown as typeof fetch,
+    });
+    await expect(resend.sendBroadcast(input)).rejects.toThrow();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('lists broadcasts a page at a time', async () => {
+    const { resend, calls } = client([
+      {
+        status: 200,
+        body: {
+          object: 'list',
+          has_more: true,
+          data: [
+            { id: 'b-2', name: 'Two [issue y]', status: 'sent', sent_at: '2026-10-14T10:00:00.000Z', segment_id: 'seg' },
+            { id: 'b-1', name: null, status: 'draft', sent_at: null },
+          ],
+        },
+      },
+    ]);
+    expect(await resend.listBroadcasts('b-3')).toEqual({
+      broadcasts: [
+        { id: 'b-2', name: 'Two [issue y]', status: 'sent', sentAt: '2026-10-14T10:00:00.000Z' },
+        { id: 'b-1', name: '', status: 'draft', sentAt: null },
+      ],
+      hasMore: true,
+    });
+    expect(calls[0].url).toBe('https://api.resend.com/broadcasts?limit=100&after=b-3');
+  });
+});
