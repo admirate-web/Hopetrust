@@ -44,37 +44,9 @@ CREATE POLICY "Deny anon delete" ON contact_submissions
 
 -- ------------------------------------------------------------
 -- TABLE: newsletter_subscribers
--- Policy: anon can INSERT only. No SELECT / UPDATE / DELETE.
+-- Moved to Database/newsletter.sql (October 2026). It has no anon policies:
+-- sign-ups go through the newsletter-subscribe Netlify function.
 -- ------------------------------------------------------------
-
-ALTER TABLE newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow anonymous inserts"        ON newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_insert_newsletter"         ON newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_select_newsletter"         ON newsletter_subscribers;
-DROP POLICY IF EXISTS "Deny anon select"               ON newsletter_subscribers;
-DROP POLICY IF EXISTS "Deny anon update"               ON newsletter_subscribers;
-DROP POLICY IF EXISTS "Deny anon delete"               ON newsletter_subscribers;
-
--- INSERT: allowed for anon with data validation
-CREATE POLICY "anon_insert_newsletter" ON newsletter_subscribers
-  FOR INSERT
-  TO anon
-  WITH CHECK (
-    full_name IS NOT NULL AND char_length(trim(full_name)) >= 2  AND char_length(trim(full_name)) <= 200 AND
-    email     IS NOT NULL AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'                                      AND
-    phone     IS NOT NULL AND char_length(trim(phone))     >= 7  AND char_length(trim(phone))     <= 20
-  );
-
--- SELECT / UPDATE / DELETE: explicitly blocked for anon
-CREATE POLICY "Deny anon select" ON newsletter_subscribers
-  FOR SELECT TO anon USING (false);
-
-CREATE POLICY "Deny anon update" ON newsletter_subscribers
-  FOR UPDATE TO anon USING (false);
-
-CREATE POLICY "Deny anon delete" ON newsletter_subscribers
-  FOR DELETE TO anon USING (false);
 
 
 -- ------------------------------------------------------------
@@ -116,8 +88,9 @@ CREATE POLICY "Deny anon delete" ON joinus_applications
 -- ------------------------------------------------------------
 -- VERIFICATION QUERY
 -- Run this after applying policies to confirm setup.
--- Expected: every table shows relrowsecurity = true
---           and policies show 3 inserts + 3 denials each.
+-- Expected: every table shows relrowsecurity = true; contact_submissions and
+--           joinus_applications show 1 insert + 3 denials each, and
+--           newsletter_subscribers shows no policies (see newsletter.sql).
 -- ------------------------------------------------------------
 
 SELECT
