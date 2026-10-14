@@ -9,9 +9,14 @@ import { SEGMENT, SITE, jsonRequest, makeDeps } from './fakes';
 
 const ENDPOINT = 'https://hopetrustindia.com/api/newsletter-subscribe';
 const MINUTE = 60_000;
-const DAY = 24 * 60 * MINUTE;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 const OK = { ok: true, message: SIGNUP_SUCCESS_MESSAGE };
+const IP_BUSY = 'Too many sign-ups from your connection. Please try again in a few minutes.';
 const SITE_BUSY = "We're getting a lot of sign-ups right now. Please try again later.";
+
+/** A different IP address for each n, so only the site-wide cap applies. */
+const ipFor = (n: number) => `10.0.${Math.floor(n / 250)}.${n % 250}`;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -98,10 +103,12 @@ describe('newsletter-subscribe', () => {
     expect(sleeps).toEqual([]);
   });
 
-  it('treats a filled honeypot as a bot: same answer, nothing saved or sent', async () => {
-    const { deps, memory, resend } = makeDeps();
+  it('treats a filled honeypot as a bot: same answer after the same wait, nothing saved or sent', async () => {
+    const { deps, memory, resend, sleeps } = makeDeps();
     expect(await send(deps, signup({ website: 'http://spam.example' }))).toEqual({ status: 200, body: OK });
+    expect(sleeps).toEqual([2500]);
     expect(memory.rows.size).toBe(0);
+    expect(memory.requests).toEqual([]);
     expect(resend.sent).toHaveLength(0);
   });
 
@@ -224,23 +231,28 @@ describe('newsletter-subscribe', () => {
     expect(SIGNUP_RULES.minAnswerMs).toBe(2500);
   });
 
-  it('takes the same time over an error before the address is looked up', async () => {
-    const { deps, sleeps } = makeDeps();
-    quietErrors();
-    const broken: NewsletterDeps = {
-      ...deps,
-      db: {
-        ...deps.db,
-        countRecentFromIp: async () => {
-          throw new Error('Supabase is down');
+  it.each(['countRequestsSince', 'recordRequest'] as const)(
+    'takes the same time when %s fails, and answers before the address is looked up',
+    async (method) => {
+      const { deps, sleeps } = makeDeps();
+      quietErrors();
+      const findByEmail = vi.spyOn(deps.db, 'findByEmail');
+      const broken: NewsletterDeps = {
+        ...deps,
+        db: {
+          ...deps.db,
+          [method]: async () => {
+            throw new Error('Supabase is down');
+          },
         },
-      },
-    };
-    const { status, body } = await send(broken, signup());
-    expect(status).toBe(500);
-    expect(body.error).toMatch(/try again/i);
-    expect(sleeps).toEqual([2500]);
-  });
+      };
+      const { status, body } = await send(broken, signup());
+      expect(status).toBe(500);
+      expect(body.error).toMatch(/try again/i);
+      expect(findByEmail).not.toHaveBeenCalled();
+      expect(sleeps).toEqual([2500]);
+    },
+  );
 
   it('emails a subscribed address that unsubscribed on Resend\'s page since the last sync', async () => {
     const { deps, memory, resend } = makeDeps();
@@ -334,51 +346,165 @@ describe('newsletter-subscribe', () => {
     expect(memory.byEmail('asha@example.com')?.confirm_send_count).toBe(1);
   });
 
-  it('limits each IP address to 5 addresses per 15 minutes', async () => {
+  it('limits each IP address to 5 requests per 15 minutes', async () => {
     const { deps, clock, sleeps } = makeDeps();
     for (let i = 0; i < 5; i++) {
       expect((await send(deps, signup({ email: `p${i}@example.com` }))).status).toBe(200);
     }
     const blocked = await send(deps, signup({ email: 'p5@example.com' }));
-    expect(blocked.status).toBe(429);
-    expect(blocked.body.error).toMatch(/try again/i);
+    expect(blocked).toEqual({ status: 429, body: { error: IP_BUSY } });
     expect(sleeps.at(-1)).toBe(2500);
     expect((await send(deps, signup({ email: 'p5@example.com' }, '198.51.100.1'))).status).toBe(200);
     clock.advance(16 * MINUTE);
     expect((await send(deps, signup({ email: 'p6@example.com' }))).status).toBe(200);
   });
 
-  it('stops at 40 confirmation emails an hour across the whole site, whatever the address', async () => {
-    const { deps, memory, resend, clock, sleeps } = makeDeps();
-    const halfAnHourAgo = new Date(deps.now().getTime() - 30 * MINUTE).toISOString();
-    for (let i = 0; i < 40; i++) {
-      memory.seed({ email: `p${i}@example.com`, status: 'pending', signup_ip: `198.51.100.${i}`, confirm_sent_at: halfAnHourAgo });
+  // The probe from the re-review: a subscribed address (or one inside its
+  // 10-minute gap) sends nothing, so a limit that counted sends would let the
+  // sixth request through only when the candidate is on the list.
+  it('gives the same answers from one IP whatever the fifth address is, so the limit shows nothing', async () => {
+    const candidate = 'candidate@example.com';
+    const arrange: Record<string, (memory: ReturnType<typeof makeDeps>['memory'], now: number) => void> = {
+      subscribed: (memory) => memory.seed({ email: candidate, status: 'subscribed' }),
+      'pending inside its 10-minute gap': (memory, now) =>
+        memory.seed({
+          email: candidate,
+          status: 'pending',
+          signup_ip: '198.51.100.99',
+          confirm_sent_at: new Date(now - 5 * MINUTE).toISOString(),
+          confirm_send_count: 1,
+        }),
+      unsubscribed: (memory) => memory.seed({ email: candidate, status: 'unsubscribed' }),
+      new: () => {},
+    };
+
+    const answers: Record<string, unknown[]> = {};
+    for (const [kind, seed] of Object.entries(arrange)) {
+      const { deps, memory } = makeDeps();
+      seed(memory, deps.now().getTime());
+      answers[kind] = [];
+      for (const email of ['own1@example.com', 'own2@example.com', 'own3@example.com', 'own4@example.com', candidate, 'own5@example.com']) {
+        answers[kind].push(await send(deps, signup({ email })));
+      }
     }
-    memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
 
-    const forNew = await send(deps, signup({ email: 'new@example.com' }));
-    const forSubscribed = await send(deps, signup({ email: 'subscribed@example.com' }));
-    expect(forNew).toEqual({ status: 429, body: { error: SITE_BUSY } });
-    expect(forSubscribed).toEqual(forNew);
-    expect(sleeps).toEqual([2500, 2500]);
-    // Nothing sent, and nothing looked up in Resend.
-    expect(resend.calls).toEqual([]);
-    expect(memory.byEmail('new@example.com')).toBeUndefined();
-
-    clock.advance(31 * MINUTE);
-    expect(await send(deps, signup({ email: 'new@example.com' }))).toEqual({ status: 200, body: OK });
-    expect(resend.sent).toHaveLength(1);
+    const expected = [...Array(5).fill({ status: 200, body: OK }), { status: 429, body: { error: IP_BUSY } }];
+    expect(answers).toEqual({
+      subscribed: expected,
+      'pending inside its 10-minute gap': expected,
+      unsubscribed: expected,
+      new: expected,
+    });
   });
 
-  it('stops at 80 confirmation emails a day across the whole site', async () => {
-    const { deps, memory, resend } = makeDeps();
-    const earlierToday = new Date(deps.now().getTime() - 3 * 60 * MINUTE).toISOString();
-    for (let i = 0; i < 79; i++) {
-      memory.seed({ email: `p${i}@example.com`, status: 'pending', signup_ip: `198.51.100.${i}`, confirm_sent_at: earlierToday });
+  it('counts every request toward the site cap, whatever the address: the 41st in an hour is refused', async () => {
+    const { deps, memory, resend, clock, sleeps } = makeDeps();
+    memory.seed({ email: 'subscribed@example.com', status: 'subscribed' });
+    // From 40 IPs: one address asked for again and again, a subscribed one, and new ones.
+    for (let n = 0; n < 40; n++) {
+      const email = ['again@example.com', 'subscribed@example.com', `new${n}@example.com`][n % 3];
+      expect(await send(deps, signup({ email }, ipFor(n)))).toEqual({ status: 200, body: OK });
     }
-    expect(await send(deps, signup({ email: 'eightieth@example.com' }))).toEqual({ status: 200, body: OK });
-    expect(await send(deps, signup({ email: 'one-more@example.com' }))).toEqual({ status: 429, body: { error: SITE_BUSY } });
-    expect(resend.sent.map((e) => e.to[0])).toEqual(['eightieth@example.com']);
+    // Only the first request for again@ and the new addresses sent anything, but all 40 counted.
+    expect(resend.sent).toHaveLength(14);
+    expect(memory.requests).toHaveLength(40);
+
+    expect(await send(deps, signup({ email: 'late@example.com' }, ipFor(40)))).toEqual({
+      status: 429,
+      body: { error: SITE_BUSY },
+    });
+    expect(sleeps.at(-1)).toBe(2500);
+    // A refused request isn't counted, so the hour empties once the traffic stops.
+    expect(memory.requests).toHaveLength(40);
+    clock.advance(61 * MINUTE);
+    expect(await send(deps, signup({ email: 'late@example.com' }, ipFor(41)))).toEqual({ status: 200, body: OK });
+  });
+
+  it('refuses the 81st request in a day spread across hours, until the earliest leave the day', async () => {
+    const { deps, memory, clock } = makeDeps();
+    let n = 0;
+    // 20 an hour for 4 hours: always under the hourly cap.
+    for (let hour = 0; hour < 4; hour++) {
+      for (let i = 0; i < 20; i++, n++) {
+        expect((await send(deps, signup({ email: `p${n}@example.com` }, ipFor(n)))).status).toBe(200);
+      }
+      clock.advance(HOUR);
+    }
+    expect(await send(deps, signup({ email: 'late@example.com' }, ipFor(n)))).toEqual({
+      status: 429,
+      body: { error: SITE_BUSY },
+    });
+    expect(memory.requests).toHaveLength(80);
+    // The first hour's 20 requests leave the day 24 hours after they came in.
+    clock.advance(20 * HOUR + MINUTE);
+    expect(await send(deps, signup({ email: 'late@example.com' }, ipFor(n + 1)))).toEqual({ status: 200, body: OK });
+  });
+
+  it('never sends more emails than it counted requests: at most 40 an hour and 80 a day, re-sends included', async () => {
+    const { deps, clock } = makeDeps();
+    const sentAt: number[] = [];
+    let recorded = 0;
+    const counting: NewsletterDeps = {
+      ...deps,
+      db: {
+        ...deps.db,
+        recordRequest: async (ip, atIso) => {
+          recorded++;
+          return deps.db.recordRequest(ip, atIso);
+        },
+      },
+      resend: {
+        ...deps.resend,
+        sendEmail: async (input) => {
+          sentAt.push(clock.now().getTime());
+          return deps.resend.sendEmail(input);
+        },
+      },
+    };
+
+    // For 26 hours, 8 IPs each ask every 3 minutes. Each IP re-sends to a
+    // batch of 4 addresses, 12 minutes apart, until each has had its 3 emails,
+    // then moves on to 4 new ones: the re-review's attack, from more IPs.
+    for (let round = 0; round < 26 * 20; round++) {
+      for (let ip = 0; ip < 8; ip++) {
+        const email = `ip${ip}-batch${Math.floor(round / 12)}-${round % 4}@example.com`;
+        await send(counting, signup({ email }, `198.51.100.${ip}`));
+        expect(sentAt.length).toBeLessThanOrEqual(recorded);
+      }
+      clock.advance(3 * MINUTE);
+    }
+
+    const mostIn = (windowMs: number) =>
+      Math.max(...sentAt.map((t) => sentAt.filter((s) => s >= t - windowMs && s <= t).length));
+    expect(mostIn(HOUR)).toBe(40);
+    expect(mostIn(DAY)).toBe(80);
+    expect(sentAt.length).toBeGreaterThan(80); // sending carried on into the second day
+  });
+
+  it('asks Resend about a subscribed address at most 5 times per 15 minutes from one IP', async () => {
+    const { deps, memory, resend, clock } = makeDeps();
+    resend.add('on@example.com', { segments: [SEGMENT] });
+    memory.seed({ email: 'on@example.com', status: 'subscribed', resend_synced_at: '2026-10-01T00:00:00.000Z' });
+    const lookups = () => resend.calls.filter((call) => call === 'getContact').length;
+
+    const statuses = [];
+    for (let i = 0; i < 10; i++) statuses.push((await send(deps, signup({ email: 'on@example.com' }))).status);
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429, 429, 429, 429, 429]);
+    expect(lookups()).toBe(5);
+
+    clock.advance(16 * MINUTE);
+    for (let i = 0; i < 10; i++) await send(deps, signup({ email: 'on@example.com' }));
+    expect(lookups()).toBe(10);
+    expect(resend.sent).toHaveLength(0);
+  });
+
+  it('deletes counted requests older than a day when a sign-up comes in', async () => {
+    const { deps, memory } = makeDeps();
+    const ago = (ms: number) => new Date(deps.now().getTime() - ms).toISOString();
+    await deps.db.recordRequest('198.51.100.1', ago(DAY + MINUTE));
+    await deps.db.recordRequest('198.51.100.2', ago(DAY - MINUTE));
+    await send(deps, signup());
+    expect(memory.requests.map((r) => r.ip)).toEqual(['198.51.100.2', '203.0.113.7']);
   });
 
   it('deletes sign-ups left unconfirmed for 30 days, but never unsubscribed rows', async () => {

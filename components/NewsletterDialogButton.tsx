@@ -12,9 +12,12 @@ const NewsletterForm = dynamic(() => import('@/components/NewsletterForm'), {
   loading: () => <Loader2 aria-label="Loading" className="mx-auto my-16 h-5 w-5 animate-spin text-[#ED7428]" />,
 });
 
-/** Starts fetching the form as soon as someone points at or tabs to the button. */
+/**
+ * Starts fetching the form as soon as someone points at or tabs to the button.
+ * A failed fetch is harmless: the dialog loads the form again when it opens.
+ */
 function preloadForm() {
-  void import('@/components/NewsletterForm');
+  import('@/components/NewsletterForm').catch(() => {});
 }
 
 /** The footer's "Subscribe to our newsletter" button and its dialog (spec §7.1). */

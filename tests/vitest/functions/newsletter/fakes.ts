@@ -69,6 +69,8 @@ export function createMemoryDb(now: () => Date) {
   const rows = new Map<string, SubscriberRow>();
   const erased = new Set<string>();
   const audits: AuditEntry[] = [];
+  /** newsletter_signup_requests, oldest first. */
+  const requests: Array<{ ip: string | null; requested_at: string }> = [];
   let lastStamp = 0;
   let ids = 0;
 
@@ -117,11 +119,18 @@ export function createMemoryDb(now: () => Date) {
       rows.set(id, next);
       return { ...next };
     },
-    async countRecentFromIp(ip, sinceIso) {
-      return all().filter((r) => r.signup_ip === ip && r.confirm_sent_at !== null && r.confirm_sent_at >= sinceIso).length;
+    async countRequestsSince(sinceIso, ip) {
+      return requests.filter((r) => r.requested_at >= sinceIso && (ip === undefined || r.ip === ip)).length;
     },
-    async countConfirmationsSince(sinceIso) {
-      return all().filter((r) => r.confirm_sent_at !== null && r.confirm_sent_at >= sinceIso).length;
+    async recordRequest(ip, atIso) {
+      refuseNul({ ip });
+      requests.push({ ip, requested_at: atIso });
+    },
+    async deleteRequestsBefore(beforeIso) {
+      const kept = requests.filter((r) => r.requested_at >= beforeIso);
+      const deleted = requests.length - kept.length;
+      requests.splice(0, requests.length, ...kept);
+      return deleted;
     },
     async deleteStalePending(beforeIso) {
       let deleted = 0;
@@ -231,6 +240,7 @@ export function createMemoryDb(now: () => Date) {
     rows,
     erased,
     audits,
+    requests,
     /** Puts a row straight into the table, defaults filled in, for arranging a test. */
     seed(row: Partial<SubscriberRow> & { email: string }): SubscriberRow {
       const created = stamp();

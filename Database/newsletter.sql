@@ -1,6 +1,6 @@
 -- =============================================================================
--- Newsletter: subscribers and erased addresses
--- Spec: docs/superpowers/specs/2026-10-13-newsletter-design.md §10.1, §10.3
+-- Newsletter: subscribers, erased addresses and sign-up requests
+-- Spec: docs/superpowers/specs/2026-10-13-newsletter-design.md §10.1, §10.3, §10.5
 --
 -- Safe to run more than once. The old 2025 table (full_name, email, phone) is
 -- dropped only while it still has that shape and no rows.
@@ -110,3 +110,24 @@ alter table public.newsletter_subscribers enable row level security;
 alter table public.newsletter_erased enable row level security;
 revoke all on table public.newsletter_subscribers from anon, authenticated;
 revoke all on table public.newsletter_erased from anon, authenticated;
+
+-- 5. Sign-up requests, for the rate limits only. Every request that passes the
+--    limits is logged, whatever address it names, so the counts can't show who
+--    is on the list. The limits count this table, not
+--    newsletter_subscribers.signup_ip. No addresses are kept, and the sign-up
+--    function deletes rows after a day. Access as in section 4.
+create table if not exists public.newsletter_signup_requests (
+  id            bigint generated always as identity primary key,
+  ip            text,
+  requested_at  timestamptz not null default now()
+);
+create index if not exists newsletter_signup_requests_requested_at_idx
+  on public.newsletter_signup_requests (requested_at);
+create index if not exists newsletter_signup_requests_ip_idx
+  on public.newsletter_signup_requests (ip, requested_at);
+
+comment on table public.newsletter_signup_requests is
+  'One row per newsletter sign-up request that passed the rate limits, used for those limits only. No email addresses; rows are deleted after a day.';
+
+alter table public.newsletter_signup_requests enable row level security;
+revoke all on table public.newsletter_signup_requests from anon, authenticated;

@@ -40,10 +40,12 @@ export interface NewsletterDb {
   insert(row: NewSubscriber): Promise<SubscriberRow>;
   /** The updated row, or null when no row matched: deleted, or changed since `ifUpdatedAt`. */
   update(id: string, patch: SubscriberPatch, ifUpdatedAt?: string): Promise<SubscriberRow | null>;
-  /** Rows whose latest confirmation email went out to a request from this IP since `sinceIso`. */
-  countRecentFromIp(ip: string, sinceIso: string): Promise<number>;
-  /** Rows whose latest confirmation email went out since `sinceIso`, from any IP. */
-  countConfirmationsSince(sinceIso: string): Promise<number>;
+  /** Logged sign-up requests since `sinceIso`: from every IP, or from `ip` only. */
+  countRequestsSince(sinceIso: string, ip?: string): Promise<number>;
+  /** Logs a sign-up request that passed the rate limits. No address is kept. */
+  recordRequest(ip: string | null, atIso: string): Promise<void>;
+  /** Deletes logged sign-up requests older than `beforeIso`; returns how many. */
+  deleteRequestsBefore(beforeIso: string): Promise<number>;
   /** Deletes pending rows whose last confirmation email (or creation) is older than `beforeIso`. */
   deleteStalePending(beforeIso: string): Promise<number>;
   list(filters: SubscriberFilters, limit: number, offset: number): Promise<{ rows: AdminSubscriber[]; total: number }>;
@@ -81,6 +83,7 @@ export class DuplicateEmailError extends Error {
 
 const SUBSCRIBERS = 'newsletter_subscribers';
 const ERASED = 'newsletter_erased';
+const REQUESTS = 'newsletter_signup_requests';
 /** Supabase's API returns at most 1,000 rows per request. */
 const PAGE = 1000;
 /** Values per `in (…)` filter, to keep request URLs short. */
@@ -133,8 +136,8 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
     return (data as SubscriberRow | null) ?? null;
   }
 
-  async function headCount(narrow: (query: any) => any): Promise<number> {
-    const { count, error } = await narrow(table().select('id', { count: 'exact', head: true }));
+  async function headCount(narrow: (query: any) => any, from = SUBSCRIBERS): Promise<number> {
+    const { count, error } = await narrow(supabase.from(from).select('id', { count: 'exact', head: true }));
     check(error);
     return count ?? 0;
   }
@@ -169,10 +172,22 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
       return (data as SubscriberRow | null) ?? null;
     },
 
-    countRecentFromIp: (ip, sinceIso) =>
-      headCount((query) => query.eq('signup_ip', ip).gte('confirm_sent_at', sinceIso)),
+    countRequestsSince: (sinceIso, ip) =>
+      headCount((query) => {
+        const since = query.gte('requested_at', sinceIso);
+        return ip === undefined ? since : since.eq('ip', ip);
+      }, REQUESTS),
 
-    countConfirmationsSince: (sinceIso) => headCount((query) => query.gte('confirm_sent_at', sinceIso)),
+    async recordRequest(ip, atIso) {
+      const { error } = await supabase.from(REQUESTS).insert({ ip, requested_at: atIso });
+      check(error);
+    },
+
+    async deleteRequestsBefore(beforeIso) {
+      const { data, error } = await supabase.from(REQUESTS).delete().lt('requested_at', beforeIso).select('id');
+      check(error);
+      return data?.length ?? 0;
+    },
 
     async deleteStalePending(beforeIso) {
       const sent = await table().delete().eq('status', 'pending').lt('confirm_sent_at', beforeIso).select('id');

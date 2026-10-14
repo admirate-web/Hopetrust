@@ -27,14 +27,18 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export const SIGNUP_RULES = {
-  /** Every answer after validation waits this long from the start, so its timing can't show whether the address is on the list. */
+  /** The honeypot's answer and every answer after validation wait this long from the start, so timing can't show whether the address is on the list. */
   minAnswerMs: 2500,
-  /** Different addresses that requests from one IP can trigger confirmation emails for, per window. */
-  maxAddressesPerIp: 5,
+  /** Sign-up requests one IP can make per window; every request counts, whatever address it names. */
+  maxRequestsPerIp: 5,
+  /** The window for maxRequestsPerIp. */
   ipWindowMs: 15 * MINUTE,
-  /** Confirmation emails from the whole site, so no one sender can use up Resend's 100 emails a day. */
-  maxSiteSendsPerHour: 40,
-  maxSiteSendsPerDay: 80,
+  /** Sign-up requests from the whole site per hour; each sends at most one email, and Resend sends 100 a day. */
+  maxSiteRequestsPerHour: 40,
+  /** Sign-up requests from the whole site per day, under Resend's 100 emails a day. */
+  maxSiteRequestsPerDay: 80,
+  /** Logged requests are deleted after this long, which covers the longest window above. */
+  requestLogLifetimeMs: DAY,
   /** Shortest gap between confirmation emails to one address. */
   resendGapMs: 10 * MINUTE,
   /** Confirmation emails one address can get without confirming, per 30 days. */
@@ -102,6 +106,12 @@ function honeypotFilled(value: unknown): boolean {
   return typeof website === 'string' && website.trim() !== '';
 }
 
+/** Sends `response` once `minAnswerMs` have passed since `started`. */
+async function afterFloor(deps: NewsletterDeps, started: number, response: Response): Promise<Response> {
+  await deps.sleep(Math.max(0, started + SIGNUP_RULES.minAnswerMs - deps.now().getTime()));
+  return response;
+}
+
 export async function handleSubscribe(req: Request, deps: NewsletterDeps | null): Promise<Response> {
   const reply = (body: unknown, status = 200) => jsonResponse(body, status, METHODS);
   if (req.method === 'OPTIONS') return preflight(METHODS);
@@ -111,7 +121,8 @@ export async function handleSubscribe(req: Request, deps: NewsletterDeps | null)
 
   const body = await readJsonBody(req, MAX_BODY_BYTES);
   if (!body.ok) return reply({ error: body.error }, body.status);
-  if (honeypotFilled(body.value)) return reply(OK);
+  // A bot gets the normal answer at the normal time, so it can't tell it was caught.
+  if (honeypotFilled(body.value)) return afterFloor(deps, started, reply(OK));
 
   const parsed = signupSchema.safeParse(body.value);
   if (!parsed.success) return reply({ error: 'Please check the form.', fields: fieldErrors(parsed.error) }, 400);
@@ -123,12 +134,12 @@ export async function handleSubscribe(req: Request, deps: NewsletterDeps | null)
   try {
     response = await subscribe(req, deps, parsed.data, reply);
   } catch (err) {
-    // Only the limits can fail this far out, and they don't depend on the address.
+    // Only the limits and the request log can fail this far out, and neither
+    // depends on the address.
     console.error('[newsletter-subscribe]', err);
     response = reply({ error: 'Something went wrong. Please try again.' }, 500);
   }
-  await deps.sleep(Math.max(0, started + SIGNUP_RULES.minAnswerMs - deps.now().getTime()));
-  return response;
+  return afterFloor(deps, started, response);
 }
 
 async function subscribe(
@@ -144,17 +155,26 @@ async function subscribe(
   await db
     .deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs))
     .catch((err) => console.error('[newsletter-subscribe] clean-up', err));
+  await db
+    .deleteRequestsBefore(iso(now - SIGNUP_RULES.requestLogLifetimeMs))
+    .catch((err) => console.error('[newsletter-subscribe] request log clean-up', err));
 
-  // The limits come before the address is looked up, so their answers can't depend on it.
-  if (ip && (await db.countRecentFromIp(ip, iso(now - SIGNUP_RULES.ipWindowMs))) >= SIGNUP_RULES.maxAddressesPerIp) {
+  // The limits count logged requests, not emails: every request counts the
+  // same, whatever address it names, and the limits run before the address is
+  // looked up. So neither their answers nor their counts show who is on the list.
+  if (ip && (await db.countRequestsSince(iso(now - SIGNUP_RULES.ipWindowMs), ip)) >= SIGNUP_RULES.maxRequestsPerIp) {
     return reply(IP_BUSY, 429);
   }
   if (
-    (await db.countConfirmationsSince(iso(now - HOUR))) >= SIGNUP_RULES.maxSiteSendsPerHour ||
-    (await db.countConfirmationsSince(iso(now - DAY))) >= SIGNUP_RULES.maxSiteSendsPerDay
+    (await db.countRequestsSince(iso(now - HOUR))) >= SIGNUP_RULES.maxSiteRequestsPerHour ||
+    (await db.countRequestsSince(iso(now - DAY))) >= SIGNUP_RULES.maxSiteRequestsPerDay
   ) {
     return reply(SITE_BUSY, 429);
   }
+  // Only requests that pass are logged, so the windows empty once the traffic
+  // stops. Each one sends at most one email and makes at most one Resend
+  // lookup, so the limits bound those too.
+  await db.recordRequest(ip, iso(now));
 
   // From here on the answer is always the same. A different answer when
   // something fails would show which addresses got far enough to fail.

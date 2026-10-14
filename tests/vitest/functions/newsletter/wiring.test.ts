@@ -37,13 +37,44 @@ function recordingSupabase() {
 }
 
 describe('createNewsletterDb queries', () => {
-  it('counts confirmation emails sent since a time, from every IP', async () => {
+  it('counts sign-up requests since a time, from every IP or from one', async () => {
     const { db, calls } = recordingSupabase();
-    await db.countConfirmationsSince('2026-10-14T09:00:00.000Z');
+    await db.countRequestsSince('2026-10-14T09:00:00.000Z');
     expect(calls).toEqual([
-      ['from', 'newsletter_subscribers'],
+      ['from', 'newsletter_signup_requests'],
       ['select', 'id', { count: 'exact', head: true }],
-      ['gte', 'confirm_sent_at', '2026-10-14T09:00:00.000Z'],
+      ['gte', 'requested_at', '2026-10-14T09:00:00.000Z'],
+    ]);
+    calls.length = 0;
+    await db.countRequestsSince('2026-10-14T09:45:00.000Z', '203.0.113.7');
+    expect(calls).toEqual([
+      ['from', 'newsletter_signup_requests'],
+      ['select', 'id', { count: 'exact', head: true }],
+      ['gte', 'requested_at', '2026-10-14T09:45:00.000Z'],
+      ['eq', 'ip', '203.0.113.7'],
+    ]);
+  });
+
+  it('records a sign-up request with its IP and time, and no address', async () => {
+    const { db, calls } = recordingSupabase();
+    await db.recordRequest('203.0.113.7', '2026-10-14T10:00:00.000Z');
+    await db.recordRequest(null, '2026-10-14T10:00:01.000Z');
+    expect(calls).toEqual([
+      ['from', 'newsletter_signup_requests'],
+      ['insert', { ip: '203.0.113.7', requested_at: '2026-10-14T10:00:00.000Z' }],
+      ['from', 'newsletter_signup_requests'],
+      ['insert', { ip: null, requested_at: '2026-10-14T10:00:01.000Z' }],
+    ]);
+  });
+
+  it('deletes sign-up requests from before a time', async () => {
+    const { db, calls } = recordingSupabase();
+    expect(await db.deleteRequestsBefore('2026-10-13T10:00:00.000Z')).toBe(0);
+    expect(calls).toEqual([
+      ['from', 'newsletter_signup_requests'],
+      ['delete'],
+      ['lt', 'requested_at', '2026-10-13T10:00:00.000Z'],
+      ['select', 'id'],
     ]);
   });
 
@@ -177,13 +208,21 @@ describe('test fakes', () => {
     expect((await deps.db.findById(row.id))?.signup_page).toBeNull();
   });
 
-  it('count recent confirmation emails across the site', async () => {
+  it('count and delete sign-up requests by time, from every IP or from one', async () => {
     const { deps, memory } = makeDeps();
-    memory.seed({ email: 'a@example.com', status: 'pending', confirm_sent_at: '2026-10-14T09:30:00.000Z' });
-    memory.seed({ email: 'b@example.com', status: 'subscribed', confirm_sent_at: '2026-10-14T08:00:00.000Z' });
-    memory.seed({ email: 'c@example.com', status: 'subscribed' });
-    expect(await deps.db.countConfirmationsSince('2026-10-14T09:00:00.000Z')).toBe(1);
-    expect(await deps.db.countConfirmationsSince('2026-10-13T10:00:00.000Z')).toBe(2);
+    await deps.db.recordRequest('203.0.113.7', '2026-10-13T09:00:00.000Z');
+    await deps.db.recordRequest('203.0.113.7', '2026-10-14T09:30:00.000Z');
+    await deps.db.recordRequest('198.51.100.1', '2026-10-14T09:40:00.000Z');
+    await deps.db.recordRequest(null, '2026-10-14T09:50:00.000Z');
+    expect(await deps.db.countRequestsSince('2026-10-14T09:00:00.000Z')).toBe(3);
+    expect(await deps.db.countRequestsSince('2026-10-14T09:00:00.000Z', '203.0.113.7')).toBe(1);
+    expect(await deps.db.countRequestsSince('2026-10-13T09:00:00.000Z', '203.0.113.7')).toBe(2);
+    expect(await deps.db.deleteRequestsBefore('2026-10-14T09:00:00.000Z')).toBe(1);
+    expect(memory.requests.map((r) => r.requested_at)).toEqual([
+      '2026-10-14T09:30:00.000Z',
+      '2026-10-14T09:40:00.000Z',
+      '2026-10-14T09:50:00.000Z',
+    ]);
   });
 
   it('skip a guarded update when the row changed since it was read', async () => {
