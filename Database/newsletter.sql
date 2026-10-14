@@ -1,10 +1,10 @@
 -- =============================================================================
--- Newsletter: subscribers, erased addresses and sign-up requests
--- Spec: docs/superpowers/specs/2026-10-13-newsletter-design.md §10.1, §10.3, §10.5
+-- Newsletter: subscribers, erased addresses, sign-up requests and issues
+-- Spec: docs/superpowers/specs/2026-10-13-newsletter-design.md §10.1, §10.2, §10.3, §10.5
 --
 -- Safe to run more than once. The old 2025 table (full_name, email, phone) is
 -- dropped only while it still has that shape and no rows.
--- The image bucket is in newsletter-storage.sql; plan 3 adds newsletter_issues.
+-- The image bucket is in newsletter-storage.sql.
 --
 -- Access: RLS is on and there are no policies, and anon/authenticated have no
 -- grants. Only the Netlify functions (service role) read or write these tables.
@@ -133,3 +133,44 @@ comment on table public.newsletter_signup_requests is
 
 alter table public.newsletter_signup_requests enable row level security;
 revoke all on table public.newsletter_signup_requests from anon, authenticated;
+
+-- 6. Issues (spec §10.2): one row per newsletter. Drafts are edited; a send
+--    moves a draft to 'sending' with a guarded update, so a double click or a
+--    second admin can't send it twice (§9.1). Sent issues stay as the record
+--    of what went out. Access as in section 4.
+create table if not exists public.newsletter_issues (
+  id                   uuid primary key default gen_random_uuid(),
+  subject              text not null default '' check (char_length(subject) <= 150),
+  preheader            text not null default '' check (char_length(preheader) <= 200),
+  issue_date           date not null default current_date,
+  title                text not null default '' check (char_length(title) <= 160),
+  hero_image_url       text check (hero_image_url is null or char_length(hero_image_url) <= 1000),
+  hero_image_alt       text not null default '' check (char_length(hero_image_alt) <= 250),
+  body                 jsonb not null default '{"type": "doc", "content": []}'::jsonb,
+  share_url            text check (share_url is null or char_length(share_url) <= 1000),
+  status               text not null default 'draft'
+                         check (status in ('draft', 'sending', 'sent', 'needs_check')),
+  last_error           text check (last_error is null or char_length(last_error) <= 2000),
+  resend_broadcast_id  text,
+  recipient_count      int,
+  sent_at              timestamptz,
+  sent_by              text,
+  created_by           text not null,
+  updated_by           text,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+
+create index if not exists newsletter_issues_created_at_idx
+  on public.newsletter_issues (created_at desc);
+
+drop trigger if exists newsletter_issues_updated_at on public.newsletter_issues;
+create trigger newsletter_issues_updated_at
+  before update on public.newsletter_issues
+  for each row execute function set_updated_at();
+
+comment on table public.newsletter_issues is
+  'Newsletter issues: drafts, and sent issues kept read-only as the record. Written only by the admin-newsletter-issues Netlify function.';
+
+alter table public.newsletter_issues enable row level security;
+revoke all on table public.newsletter_issues from anon, authenticated;
