@@ -74,6 +74,7 @@ These need someone with access to Resend, GoDaddy (DNS for `hopetrustindia.com`)
    - Decide on tracking for the domain. Click tracking is useful. Open counts have been unreliable since Apple Mail Privacy Protection.
 4. **Netlify environment variables.**
    - New: `RESEND_API_KEY`, `RESEND_NEWSLETTER_SEGMENT_ID`, and `NEWSLETTER_FROM_EMAIL` set to `Hope Trust <newsletter@hopetrustindia.com>`.
+   - `RESEND_API_KEY` must be a **Full access** key. The sync manages contacts and segments, and a Sending access key can't.
    - Already set: `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`, `NEXT_PUBLIC_SITE_URL`.
    - `NEWSLETTER_FROM_EMAIL` is also the fallback sender for the currently disabled enrollment emails in `netlify/functions/_shared/emails.mjs`.
 
@@ -115,6 +116,12 @@ NewsletterForm (footer, blog,  --->   newsletter-subscribe     ---------> Supaba
 | `components/admin/newsletter/*` | Newsletter tab: issues list, editor, preview, send dialog, subscribers screen, import dialog | `/arel-ops` |
 | `components/NewsletterForm.tsx` | Public signup form, rewritten | Footer dialog, blog listing, homepage card |
 | `app/newsletter/confirm/page.tsx` | Confirmation page | Link in the confirmation email |
+
+**As built in plan 2:**
+
+- The handlers are in `netlify/functions/_shared/newsletter-signup.mts`, `newsletter-admin.mts` and `newsletter-sync.mts`.
+- Their services (database, Resend, settings, clock, admin check) are passed in through `newsletter-deps.mts`, so tests use in-memory versions.
+- The JSON and CORS helpers are in `http.mts`, and the audit-log write is in `newsletter-db.mts`. `admin.mts` keeps only the JWT check.
 
 ## 6. The email
 
@@ -204,9 +211,9 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
 
 1. **Validate** with zod: name 2–200 characters; email valid, at most 254 characters, stored in lower case.
 2. **Honeypot.** If it's filled, return the normal success response and do nothing else.
-3. **Rate limit**, using the same counting pattern as `create-order`. These limits stop the form being used to flood someone's inbox.
-   - At most 5 confirmation emails per IP address per 15 minutes.
-   - Per email address: at least 10 minutes between confirmation emails, and at most 3 while the address is pending.
+3. **Rate limit.** These limits stop the form being used to flood someone's inbox.
+   - **Per IP address:** confirmation emails for at most 5 addresses per 15 minutes. Over that, the form says to try again later (429). This limit describes the requester, not the address.
+   - **Per email address:** at least 10 minutes between confirmation emails, and at most 3 before the address confirms, counted over 30 days. Over these limits the answer is the normal success message and nothing is sent. A different answer would show that the address had signed up recently.
 4. **Act on the current status:**
    - New address: save as `pending` with a confirmation token, and send the confirmation email.
    - Pending: send the confirmation again, within the limits above.
@@ -219,13 +226,13 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
 - **The email** goes out through Resend's regular API, from the same sender.
   - Subject: "Confirm your Hope Trust newsletter subscription".
   - One button, and the line "If you didn't sign up, ignore this email and you won't be added."
-- **The link** is `https://hopetrustindia.com/newsletter/confirm/?t=<token>`.
+- **The link** is `https://hopetrustindia.com/newsletter/confirm/#t=<token>`. The token is in the URL fragment, which browsers never send to a server, so it stays out of server logs and Google Analytics.
   - The token is 32 random bytes; only its SHA-256 hash is stored.
   - It's valid for 7 days and works once.
 - **The confirm page asks for a click** ("Confirm my subscription") rather than confirming when the page loads, because corporate email scanners open links automatically. The click calls `newsletter-confirm`.
 - **`newsletter-confirm`:**
   - With a valid token on a `pending` or `unsubscribed` row, it:
-    1. sets the row to `subscribed`, with `consent_at` set to now, and clears `unsubscribed_at` and `unsubscribe_source`;
+    1. sets the row to `subscribed` with `source = 'website'`, `consent_at` set to now and a `consent_note` naming the page and notice version, and clears `unsubscribed_at` and `unsubscribe_source`;
     2. clears the token, and removes the address's hash from `newsletter_erased` if it's there (§7.5);
     3. marks the row for Resend sync and tries to push it to Resend straight away. If that fails, the next sync retries.
   - If the token is invalid or expired, the page offers to sign up again.
@@ -248,7 +255,7 @@ Test sends don't go through broadcasts, and Resend fills in the real link only f
 
 ### 7.5 Erasure
 
-Delete removes the row and the Resend contact. The audit log records the subscriber ID, not the email address.
+Delete removes the Resend contact first, then the row. If Resend fails, the row stays: the delete can be retried, and nobody is left in the segment with no row behind them. The audit log records the subscriber ID, not the email address.
 
 Delete also adds a SHA-256 hash of the address to `newsletter_erased`, which stores no readable personal data. Imports skip hashed addresses, so an old spreadsheet can't add the person back. If the person later signs up on the website and confirms, that is fresh consent, so the hash is removed.
 
@@ -317,18 +324,25 @@ The function renders the saved issue in test mode and sends it through Resend's 
 
 ### 9.3 Sync
 
-1. **Pull.** List the contacts in the Newsletter segment, 100 per page. Any contact unsubscribed in Resend but `subscribed` in Supabase becomes `unsubscribed`, with `unsubscribe_source = 'resend'`.
-2. **Push.** Take rows where `resend_synced_at is null`, about 40 per call. Resend allows 10 requests a second, and Netlify functions time out after about 10 seconds. For each row:
-   - **Subscribed:** create the contact in the segment. If it already exists, update it to `unsubscribed: false` and make sure it's in the segment. Resend's docs confirm create, update and delete by email; the exact call for adding an existing contact to a segment gets checked in phase 2.
-   - **Unsubscribed:** update it to `unsubscribed: true`.
-   - Then set `resend_synced_at`.
+1. **Pull.** List the contacts in the Newsletter segment, 100 per page.
+   - **Unsubscribed in Resend, `subscribed` here:** the row becomes `unsubscribed`, with `unsubscribe_source = 'resend'`. The exception is a row with a change still waiting to go to Resend: that change is newer consent, such as a confirmation, so the row is left alone.
+   - **Subscribed in Resend, `unsubscribed` here:** the unsubscribe is pushed again.
+   - **In the segment with no consent on record** (no row, or a pending one): the contact is removed from the segment.
+2. **Push.** Take rows where `resend_synced_at is null`, oldest change first, for about 7 seconds per call. Resend allows 10 requests a second, and Netlify may stop a function after 10 seconds. For each row:
+   - **Subscribed:** look the contact up by email.
+     - If there is none, create it straight into the segment.
+     - If there is one, set `unsubscribed: false` and add it to the segment (`POST /contacts/{id}/segments/{segment_id}`).
+     - The exception is an imported row whose address already unsubscribed in Resend: it stays unsubscribed.
+   - **Unsubscribed:** update the contact to `unsubscribed: true`. If Resend has no such contact, there's nothing to do.
+   - Only the email address and the subscription state go to Resend, never names.
+   - Then set `resend_synced_at`, but only if the row hasn't changed since it was read.
 3. **Report** what was pulled, what was pushed and how many rows remain. The screen calls again until none remain.
 
 **Contact limit.** Resend's free plan allows 1,000 stored contacts, including unsubscribed ones, and refuses broadcasts while you're over the limit. Supabase keeps the unsubscribe record. So if the limit gets close, unsubscribed contacts can be deleted from Resend without any risk of re-adding them.
 
 ## 10. Data
 
-All SQL goes in `Database/newsletter.sql`, alongside the other schema files.
+The tables are in `Database/newsletter.sql` and the image bucket is in `Database/newsletter-storage.sql`. `Database/newsletter.sql` has the exact schema; the blocks below are the design.
 
 ### 10.1 `newsletter_subscribers`
 
@@ -377,6 +391,14 @@ create index on newsletter_subscribers (resend_synced_at) where resend_synced_at
 ```
 
 `full_name` may be empty only for imported rows; the website form requires it.
+
+**As built in plan 2:**
+
+- **New column:** `signup_notice` holds the notice version the person saw.
+- **`confirm_token_hash` is unique.**
+- **`signup_page`, `signup_ip`, `signup_user_agent` and `signup_notice`** describe the latest website sign-up request.
+- **`consent_at` and `consent_note`** describe the consent itself. They change only on confirmation or import, so an unconfirmed re-signup never overwrites the record of when and how someone first agreed.
+- **`source`** is where the current consent came from.
 
 ### 10.2 `newsletter_issues` (new)
 
