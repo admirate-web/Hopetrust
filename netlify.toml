@@ -531,6 +531,11 @@
   to = "/.netlify/functions/admin-newsletter-subscribers"
   status = 200
 
+[[redirects]]
+  from = "/api/admin-newsletter-issues"
+  to = "/.netlify/functions/admin-newsletter-issues"
+  status = 200
+
 # PAYMENT DISABLED — uncomment when Razorpay is integrated
 # # Booking + Razorpay flow (Netlify Functions)
 # [[redirects]]
