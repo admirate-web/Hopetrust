@@ -47,3 +47,35 @@ test.describe('Newsletter sign-up', () => {
     expect(bodies[0]).toMatchObject({ page: '/' });
   });
 });
+
+test.describe('Confirm page', () => {
+  const TOKEN = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123456';
+
+  test('confirms with the token from the emailed link', async ({ page }) => {
+    let sent: unknown;
+    await page.route('**/api/newsletter-confirm', async (route) => {
+      sent = route.request().postDataJSON();
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    });
+    await page.goto(`/newsletter/confirm/#t=${TOKEN}`);
+    await page.getByRole('button', { name: 'Confirm my subscription' }).click();
+    await expect(page.getByRole('heading', { name: "You're subscribed" })).toBeVisible();
+    expect(sent).toEqual({ token: TOKEN });
+    await expect(page).toHaveURL(/\/newsletter\/confirm\/$/);
+  });
+
+  test('offers the form again when the link has expired', async ({ page }) => {
+    await page.route('**/api/newsletter-confirm', (route) =>
+      route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"expired"}' }),
+    );
+    await page.goto(`/newsletter/confirm/#t=${TOKEN}`);
+    await page.getByRole('button', { name: 'Confirm my subscription' }).click();
+    await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
+    await expect(page.getByLabel('Email address')).toBeVisible();
+  });
+
+  test('is kept out of search results', async ({ page }) => {
+    await page.goto('/newsletter/confirm/');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+  });
+});
