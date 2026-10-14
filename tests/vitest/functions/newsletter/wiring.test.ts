@@ -12,14 +12,14 @@ import {
 import { liveDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
 import { SEGMENT, makeDeps } from './fakes';
 
-/** A Supabase client that answers every query with no rows and records the query-builder calls. */
-function recordingSupabase() {
+/** A Supabase client that answers every query with `result` (no rows by default) and records the query-builder calls. */
+function recordingSupabase(result: { data: unknown; error: null; count: number } = { data: [], error: null, count: 0 }) {
   const calls: unknown[][] = [];
   const builder: object = new Proxy(
     {},
     {
       get(_target, prop) {
-        if (prop === 'then') return (resolve: (value: unknown) => void) => resolve({ data: [], error: null, count: 0 });
+        if (prop === 'then') return (resolve: (value: unknown) => void) => resolve(result);
         return (...args: unknown[]) => {
           calls.push([prop, ...args]);
           return builder;
@@ -55,16 +55,26 @@ describe('createNewsletterDb queries', () => {
     ]);
   });
 
-  it('records a sign-up request with its IP and time, and no address', async () => {
-    const { db, calls } = recordingSupabase();
-    await db.recordRequest('203.0.113.7', '2026-10-14T10:00:00.000Z');
+  it('records a sign-up request with its IP and time, and no address, and returns its id', async () => {
+    const { db, calls } = recordingSupabase({ data: { id: 7 }, error: null, count: 0 });
+    expect(await db.recordRequest('203.0.113.7', '2026-10-14T10:00:00.000Z')).toBe(7);
     await db.recordRequest(null, '2026-10-14T10:00:01.000Z');
     expect(calls).toEqual([
       ['from', 'newsletter_signup_requests'],
       ['insert', { ip: '203.0.113.7', requested_at: '2026-10-14T10:00:00.000Z' }],
+      ['select', 'id'],
+      ['single'],
       ['from', 'newsletter_signup_requests'],
       ['insert', { ip: null, requested_at: '2026-10-14T10:00:01.000Z' }],
+      ['select', 'id'],
+      ['single'],
     ]);
+  });
+
+  it('deletes one sign-up request by its id', async () => {
+    const { db, calls } = recordingSupabase();
+    await db.deleteRequest(7);
+    expect(calls).toEqual([['from', 'newsletter_signup_requests'], ['delete'], ['eq', 'id', 7]]);
   });
 
   it('deletes sign-up requests from before a time', async () => {
@@ -223,6 +233,15 @@ describe('test fakes', () => {
       '2026-10-14T09:40:00.000Z',
       '2026-10-14T09:50:00.000Z',
     ]);
+  });
+
+  it('give each logged request its own id, and delete one by it', async () => {
+    const { deps, memory } = makeDeps();
+    const first = await deps.db.recordRequest('203.0.113.7', '2026-10-14T09:30:00.000Z');
+    const second = await deps.db.recordRequest('203.0.113.7', '2026-10-14T09:30:00.000Z');
+    expect(second).not.toBe(first);
+    await deps.db.deleteRequest(first);
+    expect(memory.requests.map((r) => r.id)).toEqual([second]);
   });
 
   it('skip a guarded update when the row changed since it was read', async () => {

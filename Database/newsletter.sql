@@ -42,7 +42,7 @@ create table if not exists public.newsletter_subscribers (
   imported_by               text,
   import_batch_id           uuid,
 
-  -- the latest website sign-up request (also used for the rate limits)
+  -- the latest website sign-up request (the rate limits use newsletter_signup_requests)
   signup_page               text check (signup_page is null or char_length(signup_page) <= 200),
   signup_ip                 text,
   signup_user_agent         text check (signup_user_agent is null or char_length(signup_user_agent) <= 500),
@@ -111,11 +111,13 @@ alter table public.newsletter_erased enable row level security;
 revoke all on table public.newsletter_subscribers from anon, authenticated;
 revoke all on table public.newsletter_erased from anon, authenticated;
 
--- 5. Sign-up requests, for the rate limits only. Every request that passes the
---    limits is logged, whatever address it names, so the counts can't show who
---    is on the list. The limits count this table, not
---    newsletter_subscribers.signup_ip. No addresses are kept, and the sign-up
---    function deletes rows after a day. Access as in section 4.
+-- 5. Sign-up requests, for the rate limits only. Every request is logged here
+--    before the limits are checked, whatever address it names, and counted
+--    itself included, so the counts can't show who is on the list and requests
+--    that arrive together see one another. A request a limit refuses is deleted
+--    again. The limits count this table, not newsletter_subscribers.signup_ip.
+--    No addresses are kept, and the sign-up function deletes rows after a day.
+--    Access as in section 4.
 create table if not exists public.newsletter_signup_requests (
   id            bigint generated always as identity primary key,
   ip            text,
@@ -127,7 +129,7 @@ create index if not exists newsletter_signup_requests_ip_idx
   on public.newsletter_signup_requests (ip, requested_at);
 
 comment on table public.newsletter_signup_requests is
-  'One row per newsletter sign-up request that passed the rate limits, used for those limits only. No email addresses; rows are deleted after a day.';
+  'Newsletter sign-up requests, for the rate limits only: each is logged before the limits are checked and deleted again if refused. No email addresses; rows are deleted after a day.';
 
 alter table public.newsletter_signup_requests enable row level security;
 revoke all on table public.newsletter_signup_requests from anon, authenticated;

@@ -70,7 +70,8 @@ export function createMemoryDb(now: () => Date) {
   const erased = new Set<string>();
   const audits: AuditEntry[] = [];
   /** newsletter_signup_requests, oldest first. */
-  const requests: Array<{ ip: string | null; requested_at: string }> = [];
+  const requests: Array<{ id: number; ip: string | null; requested_at: string }> = [];
+  let requestIds = 0;
   let lastStamp = 0;
   let ids = 0;
 
@@ -124,7 +125,13 @@ export function createMemoryDb(now: () => Date) {
     },
     async recordRequest(ip, atIso) {
       refuseNul({ ip });
-      requests.push({ ip, requested_at: atIso });
+      const id = ++requestIds;
+      requests.push({ id, ip, requested_at: atIso });
+      return id;
+    },
+    async deleteRequest(id) {
+      const at = requests.findIndex((r) => r.id === id);
+      if (at >= 0) requests.splice(at, 1);
     },
     async deleteRequestsBefore(beforeIso) {
       const kept = requests.filter((r) => r.requested_at >= beforeIso);

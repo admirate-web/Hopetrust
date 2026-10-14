@@ -443,14 +443,19 @@ describe('newsletter-subscribe', () => {
   it('never sends more emails than it counted requests: at most 40 an hour and 80 a day, re-sends included', async () => {
     const { deps, clock } = makeDeps();
     const sentAt: number[] = [];
-    let recorded = 0;
+    // Requests the log keeps: every request is logged, and a refused one is deleted again.
+    let kept = 0;
     const counting: NewsletterDeps = {
       ...deps,
       db: {
         ...deps.db,
         recordRequest: async (ip, atIso) => {
-          recorded++;
+          kept++;
           return deps.db.recordRequest(ip, atIso);
+        },
+        deleteRequest: async (id) => {
+          kept--;
+          return deps.db.deleteRequest(id);
         },
       },
       resend: {
@@ -469,7 +474,7 @@ describe('newsletter-subscribe', () => {
       for (let ip = 0; ip < 8; ip++) {
         const email = `ip${ip}-batch${Math.floor(round / 12)}-${round % 4}@example.com`;
         await send(counting, signup({ email }, `198.51.100.${ip}`));
-        expect(sentAt.length).toBeLessThanOrEqual(recorded);
+        expect(sentAt.length).toBeLessThanOrEqual(kept);
       }
       clock.advance(3 * MINUTE);
     }
@@ -505,6 +510,61 @@ describe('newsletter-subscribe', () => {
     await deps.db.recordRequest('198.51.100.2', ago(DAY - MINUTE));
     await send(deps, signup());
     expect(memory.requests.map((r) => r.ip)).toEqual(['198.51.100.2', '203.0.113.7']);
+  });
+
+  // Every request is logged before it is counted, so requests that arrive
+  // together see one another and can't all slip under a limit at once.
+  it('lets at most 5 of 20 simultaneous requests from one IP through, and one again after the window', async () => {
+    const { deps, memory, resend, clock } = makeDeps();
+    const answers = await Promise.all(
+      Array.from({ length: 20 }, (_, n) => send(deps, signup({ email: `burst${n}@example.com` }))),
+    );
+    const passed = answers.filter((a) => a.status === 200).length;
+    expect(passed).toBeLessThanOrEqual(5);
+    expect(resend.sent.length).toBeLessThanOrEqual(5);
+    expect(answers.filter((a) => a.status !== 200)).toEqual(
+      Array(20 - passed).fill({ status: 429, body: { error: IP_BUSY } }),
+    );
+    // The log keeps only the requests that passed.
+    expect(memory.requests).toHaveLength(passed);
+
+    clock.advance(16 * MINUTE);
+    expect(await send(deps, signup({ email: 'later@example.com' }))).toEqual({ status: 200, body: OK });
+  });
+
+  it('lets at most 40 of 100 simultaneous requests from 100 IPs through in the hour, and one again after it', async () => {
+    const { deps, memory, resend, clock } = makeDeps();
+    const answers = await Promise.all(
+      Array.from({ length: 100 }, (_, n) => send(deps, signup({ email: `burst${n}@example.com` }, ipFor(n)))),
+    );
+    const passed = answers.filter((a) => a.status === 200).length;
+    expect(passed).toBeLessThanOrEqual(40);
+    expect(resend.sent.length).toBeLessThanOrEqual(40);
+    expect(answers.filter((a) => a.status !== 200)).toEqual(
+      Array(100 - passed).fill({ status: 429, body: { error: SITE_BUSY } }),
+    );
+    expect(memory.requests).toHaveLength(passed);
+
+    clock.advance(61 * MINUTE);
+    expect(await send(deps, signup({ email: 'later@example.com' }, ipFor(100)))).toEqual({ status: 200, body: OK });
+  });
+
+  it('still refuses a request over a limit when its row cannot be deleted: the leftover only makes the limit stricter', async () => {
+    const { deps, memory } = makeDeps();
+    const errors = quietErrors();
+    const broken: NewsletterDeps = {
+      ...deps,
+      db: {
+        ...deps.db,
+        deleteRequest: async () => {
+          throw new Error('Supabase is down');
+        },
+      },
+    };
+    for (let i = 0; i < 5; i++) expect((await send(broken, signup({ email: `p${i}@example.com` }))).status).toBe(200);
+    expect(await send(broken, signup({ email: 'p5@example.com' }))).toEqual({ status: 429, body: { error: IP_BUSY } });
+    expect(errors).toHaveBeenCalledTimes(1);
+    expect(memory.requests).toHaveLength(6);
   });
 
   it('deletes sign-ups left unconfirmed for 30 days, but never unsubscribed rows', async () => {

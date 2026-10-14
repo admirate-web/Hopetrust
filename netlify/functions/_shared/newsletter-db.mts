@@ -42,8 +42,10 @@ export interface NewsletterDb {
   update(id: string, patch: SubscriberPatch, ifUpdatedAt?: string): Promise<SubscriberRow | null>;
   /** Logged sign-up requests since `sinceIso`: from every IP, or from `ip` only. */
   countRequestsSince(sinceIso: string, ip?: string): Promise<number>;
-  /** Logs a sign-up request that passed the rate limits. No address is kept. */
-  recordRequest(ip: string | null, atIso: string): Promise<void>;
+  /** Logs a sign-up request before the rate limits are checked, and returns its id. No address is kept. */
+  recordRequest(ip: string | null, atIso: string): Promise<number>;
+  /** Deletes one logged request: one a rate limit refused. */
+  deleteRequest(id: number): Promise<void>;
   /** Deletes logged sign-up requests older than `beforeIso`; returns how many. */
   deleteRequestsBefore(beforeIso: string): Promise<number>;
   /** Deletes pending rows whose last confirmation email (or creation) is older than `beforeIso`. */
@@ -179,7 +181,13 @@ export function createNewsletterDb(supabase: SupabaseClient): NewsletterDb {
       }, REQUESTS),
 
     async recordRequest(ip, atIso) {
-      const { error } = await supabase.from(REQUESTS).insert({ ip, requested_at: atIso });
+      const { data, error } = await supabase.from(REQUESTS).insert({ ip, requested_at: atIso }).select('id').single();
+      check(error);
+      return (data as { id: number }).id;
+    },
+
+    async deleteRequest(id) {
+      const { error } = await supabase.from(REQUESTS).delete().eq('id', id);
       check(error);
     },
 

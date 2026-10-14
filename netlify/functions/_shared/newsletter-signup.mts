@@ -159,22 +159,31 @@ async function subscribe(
     .deleteRequestsBefore(iso(now - SIGNUP_RULES.requestLogLifetimeMs))
     .catch((err) => console.error('[newsletter-subscribe] request log clean-up', err));
 
-  // The limits count logged requests, not emails: every request counts the
-  // same, whatever address it names, and the limits run before the address is
-  // looked up. So neither their answers nor their counts show who is on the list.
-  if (ip && (await db.countRequestsSince(iso(now - SIGNUP_RULES.ipWindowMs), ip)) >= SIGNUP_RULES.maxRequestsPerIp) {
-    return reply(IP_BUSY, 429);
+  // The limits count logged requests, not emails. Every request is logged
+  // first and then counted, itself included, whatever address it names, and
+  // all before the address is looked up: neither the answers nor the counts
+  // show who is on the list. Logging first means requests that arrive
+  // together see one another, so a burst can't slip under a limit at once.
+  // Each request that passes sends at most one email and makes at most one
+  // Resend lookup, so the limits bound those too.
+  const requestId = await db.recordRequest(ip, iso(now));
+  const refuse = async (body: typeof IP_BUSY) => {
+    // A refused request leaves the log, so the windows empty once the traffic
+    // stops. If that fails, the row left behind only makes the limits stricter.
+    await db
+      .deleteRequest(requestId)
+      .catch((err) => console.error('[newsletter-subscribe] removing a refused request', err));
+    return reply(body, 429);
+  };
+  if (ip && (await db.countRequestsSince(iso(now - SIGNUP_RULES.ipWindowMs), ip)) > SIGNUP_RULES.maxRequestsPerIp) {
+    return refuse(IP_BUSY);
   }
   if (
-    (await db.countRequestsSince(iso(now - HOUR))) >= SIGNUP_RULES.maxSiteRequestsPerHour ||
-    (await db.countRequestsSince(iso(now - DAY))) >= SIGNUP_RULES.maxSiteRequestsPerDay
+    (await db.countRequestsSince(iso(now - HOUR))) > SIGNUP_RULES.maxSiteRequestsPerHour ||
+    (await db.countRequestsSince(iso(now - DAY))) > SIGNUP_RULES.maxSiteRequestsPerDay
   ) {
-    return reply(SITE_BUSY, 429);
+    return refuse(SITE_BUSY);
   }
-  // Only requests that pass are logged, so the windows empty once the traffic
-  // stops. Each one sends at most one email and makes at most one Resend
-  // lookup, so the limits bound those too.
-  await db.recordRequest(ip, iso(now));
 
   // From here on the answer is always the same. A different answer when
   // something fails would show which addresses got far enough to fail.
