@@ -2,7 +2,9 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
 import { handleAdminIssues } from '@/netlify/functions/_shared/newsletter-issues.mts';
-import { ADMIN_EMAIL, ADMIN_TOKEN, IMAGES_BASE, jsonRequest, makeDeps } from './fakes';
+import { ResendError } from '@/netlify/functions/_shared/resend.mts';
+import type { BodyDoc } from '@/lib/newsletter/content';
+import { ADMIN_EMAIL, ADMIN_TOKEN, IMAGES_BASE, SEGMENT, jsonRequest, makeDeps } from './fakes';
 
 const BASE = 'https://hopetrustindia.com/api/admin-newsletter-issues';
 const AUTH = { authorization: `Bearer ${ADMIN_TOKEN}` };
@@ -163,5 +165,250 @@ describe('admin-newsletter-issues', () => {
     const png = await call(t.deps, 'POST', `?id=${issue.id}&action=upload-url`, { content_type: 'image/png' });
     expect(png.body.path).toMatch(/\.png$/);
     expect((await call(t.deps, 'POST', `?id=${issue.id}&action=upload-url`, { content_type: 'image/webp' })).status).toBe(400);
+  });
+});
+
+/** An issue ready to go, and one subscriber whose consent hasn't reached Resend yet. */
+function ready() {
+  const t = makeDeps();
+  t.memory.seed({ email: 'asha@example.com', status: 'subscribed', consent_at: '2026-10-01T00:00:00.000Z' });
+  const issue = t.issueStore.seed(READY);
+  return { ...t, issue };
+}
+
+describe('test send', () => {
+  it('emails the test version to up to five addresses, with [TEST] in the subject', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=test`, {
+      to: [' Asha@Example.com ', 'asha@example.com', 'ravi@example.com'],
+    });
+    expect(res).toEqual({ status: 200, body: { ok: true, to: ['asha@example.com', 'ravi@example.com'] } });
+    expect(t.resend.sent).toHaveLength(1);
+    const email = t.resend.sent[0];
+    expect(email).toMatchObject({
+      from: 'Hope Trust <newsletter@hopetrustindia.com>',
+      to: ['asha@example.com', 'ravi@example.com'],
+      replyTo: 'frontoffice@hopetrustindia.com',
+      subject: '[TEST] Know thyself',
+    });
+    expect(email.html).toContain('Know Thyself: The Start of Every Relationship');
+    expect(email.html).not.toContain('{{{RESEND_UNSUBSCRIBE_URL}}}');
+    expect(t.memory.audits).toContainEqual(
+      expect.objectContaining({ action: 'NEWSLETTER_TEST_SEND', resourceId: issue.id, metadata: { recipients: 2 } }),
+    );
+  });
+
+  it.each([
+    [{ to: [] }, 'Add at least one address.'],
+    [{ to: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com', 'f@x.com'] }, 'Send a test to at most 5 addresses.'],
+    [{ to: ['not-an-address'] }, '"not-an-address" isn\'t a valid email address.'],
+  ])('refuses %o', async (body, error) => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    expect(await call(t.deps, 'POST', `?id=${issue.id}&action=test`, body)).toEqual({ status: 400, body: { error } });
+    expect(t.resend.sent).toHaveLength(0);
+  });
+
+  it('says so when Resend fails', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    t.resend.failNext('sendEmail');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=test`, { to: ['asha@example.com'] });
+    expect(res).toEqual({ status: 502, body: { error: "Resend didn't send the test: Resend is down" } });
+  });
+});
+
+describe('send', () => {
+  it('syncs, then sends the send version to the Newsletter segment as one broadcast', async () => {
+    const t = ready();
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(200);
+    expect(res.body.issue).toMatchObject({
+      status: 'sent',
+      resend_broadcast_id: 'broadcast-1',
+      recipient_count: 1,
+      sent_by: ADMIN_EMAIL,
+      sent_at: '2026-10-14T10:00:00.000Z',
+      last_error: null,
+    });
+    // The subscriber reached Resend before the broadcast went out.
+    expect(t.resend.calls.indexOf('createContact')).toBeLessThan(t.resend.calls.indexOf('sendBroadcast'));
+    const [broadcast] = t.resend.broadcasts;
+    expect(broadcast.input).toMatchObject({
+      segmentId: SEGMENT,
+      from: 'Hope Trust <newsletter@hopetrustindia.com>',
+      replyTo: 'frontoffice@hopetrustindia.com',
+      subject: 'Know thyself',
+      name: `Know thyself [issue ${t.issue.id}]`,
+    });
+    expect(broadcast.input?.html).toContain('{{{RESEND_UNSUBSCRIBE_URL}}}');
+    expect(t.memory.audits).toContainEqual(
+      expect.objectContaining({
+        action: 'NEWSLETTER_SEND',
+        resourceId: t.issue.id,
+        metadata: { broadcast_id: 'broadcast-1', recipients: 1 },
+      }),
+    );
+  });
+
+  it('lets only one of two simultaneous sends through', async () => {
+    const t = ready();
+    const [a, b] = await Promise.all([
+      call(t.deps, 'POST', `?id=${t.issue.id}&action=send`),
+      call(t.deps, 'POST', `?id=${t.issue.id}&action=send`),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(t.resend.broadcasts).toHaveLength(1);
+  });
+
+  it.each([
+    ['there is no hero photo', { hero_image_url: null }, 'Add a hero photo.'],
+    ['the photo has no description', { hero_image_alt: '' }, "Describe the hero photo for people who can't see it."],
+    ['the subject is empty', { subject: '' }, 'Add a subject.'],
+    ['the title is blank', { title: ' ' }, 'Add a title.'],
+  ])('puts the issue back when %s', async (_why, change, problem) => {
+    const t = makeDeps();
+    t.memory.seed({ email: 'asha@example.com', status: 'subscribed' });
+    const issue = t.issueStore.seed({ ...READY, ...change });
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=send`);
+    expect(res.status).toBe(400);
+    expect(res.body.problems).toEqual([problem]);
+    expect(res.body.issue).toMatchObject({ status: 'draft', last_error: problem, sent_by: null });
+    expect(t.resend.broadcasts).toHaveLength(0);
+  });
+
+  it('refuses when there is nobody to send to', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=send`);
+    expect(res.body.problems).toEqual(['There are no subscribers to send to.']);
+    expect(t.issueStore.get(issue.id)?.status).toBe('draft');
+  });
+
+  it('refuses an email over the size limit', async () => {
+    const t = ready();
+    const long: BodyDoc = {
+      type: 'doc',
+      content: Array.from({ length: 400 }, (_, n) => ({
+        type: 'paragraph' as const,
+        content: [{ type: 'text' as const, text: `${n} ${'word '.repeat(60)}` }],
+      })),
+    };
+    const issue = t.issueStore.seed({ ...READY, body: long });
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=send`);
+    expect(res.status).toBe(400);
+    expect(res.body.problems[0]).toMatch(/^The email is \d+\.\d KB, over the 95\.0 KB limit/);
+    expect(t.resend.broadcasts).toHaveLength(0);
+  });
+
+  it("sends nothing while a subscriber change can't reach Resend, and names it", async () => {
+    const t = ready();
+    t.resend.failNext('createContact', new ResendError(422, 'validation_error', 'Invalid email'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("1 subscriber change hasn't reached Resend yet, so nothing was sent.");
+    expect(res.body.error).toContain('asha@example.com: Invalid email');
+    expect(res.body.issue.status).toBe('draft');
+    expect(t.resend.broadcasts).toHaveLength(0);
+  });
+
+  it('puts the issue back when Resend refuses the broadcast', async () => {
+    const t = ready();
+    t.resend.failNext('sendBroadcast', new ResendError(422, 'validation_error', 'The from address is not verified'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(502);
+    expect(res.body.issue).toMatchObject({
+      status: 'draft',
+      last_error: 'Resend refused the newsletter, so nothing was sent: The from address is not verified',
+    });
+  });
+
+  it("waits for Check status when Resend's answer is unclear, and won't send again meanwhile", async () => {
+    const t = ready();
+    t.resend.failNext('sendBroadcast');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(502);
+    expect(res.body.issue.status).toBe('needs_check');
+    expect(res.body.error).toMatch(/Check status/);
+    const again = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(again.status).toBe(409);
+    expect(t.resend.calls.filter((c) => c === 'sendBroadcast')).toHaveLength(1);
+  });
+
+  it('never puts back an issue that went out, even if recording it fails', async () => {
+    const t = ready();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const deps: NewsletterDeps = {
+      ...t.deps,
+      issues: {
+        ...t.deps.issues,
+        markSent: async () => {
+          throw new Error('Supabase is down');
+        },
+      },
+    };
+    const res = await call(deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(200);
+    expect(res.body.warning).toMatch(/Check status/);
+    expect(t.issueStore.get(t.issue.id)?.status).toBe('sending');
+  });
+});
+
+describe('check status', () => {
+  it('marks the issue sent when Resend has the broadcast', async () => {
+    const t = ready();
+    t.resend.loseNextReply();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`)).body.issue.status).toBe('needs_check');
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=check`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      found: true,
+      issue: { status: 'sent', resend_broadcast_id: 'broadcast-1', recipient_count: 1 },
+    });
+    expect(t.memory.audits).toContainEqual(
+      expect.objectContaining({ action: 'NEWSLETTER_SEND_CONFIRMED', resourceId: t.issue.id }),
+    );
+  });
+
+  it('puts the issue back when Resend has no such broadcast', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed({ ...READY, status: 'needs_check' });
+    t.resend.addBroadcast({ name: `Other [issue ${MISSING}]`, status: 'sent' });
+    t.resend.addBroadcast({ name: `Know thyself [issue ${issue.id}]`, status: 'draft' });
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=check`);
+    expect(res.body).toMatchObject({ found: false, issue: { status: 'draft' } });
+    expect(res.body.issue.last_error).toMatch(/no record of this send/);
+  });
+
+  it('looks through every page of broadcasts', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed({ ...READY, status: 'needs_check' });
+    t.resend.addBroadcast({ name: `Know thyself [issue ${issue.id}]`, status: 'sent' });
+    for (let n = 0; n < 150; n++) t.resend.addBroadcast({ name: `Old ${n}`, status: 'sent' });
+    expect((await call(t.deps, 'POST', `?id=${issue.id}&action=check`)).body.found).toBe(true);
+    expect(t.resend.calls.filter((c) => c === 'listBroadcasts')).toHaveLength(2);
+  });
+
+  it('lets a send that went quiet be checked after two minutes, not before', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed({ ...READY, status: 'sending' });
+    const early = await call(t.deps, 'POST', `?id=${issue.id}&action=check`);
+    expect(early.status).toBe(409);
+    expect(early.body.error).toBe('This issue is still being sent. Check again in two minutes.');
+    t.clock.advance(2 * 60_000);
+    const later = await call(t.deps, 'POST', `?id=${issue.id}&action=check`);
+    expect(later.body).toMatchObject({ found: false, issue: { status: 'draft' } });
+  });
+
+  it('has nothing to check on a draft', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    expect((await call(t.deps, 'POST', `?id=${issue.id}&action=check`)).status).toBe(409);
   });
 });
