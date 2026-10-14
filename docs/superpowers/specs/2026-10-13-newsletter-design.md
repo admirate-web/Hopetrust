@@ -601,3 +601,31 @@ Recorded 13 October 2026, from plan 1 (`docs/superpowers/plans/2026-10-13-newsle
   - Use an issue that has lists, a body image, bold and italic text and a 160-character title.
   - Check it with images blocked as well.
   - Fixes from the final review are still untested in those apps: the Outlook-only 600 px wrapper table, `aspect="atleast"` on the hero photo, list indents set with margin, and the darker orange behind the banner when images are blocked.
+
+## 17. Phase 2 results
+
+Recorded 14 October 2026, from plan 2 (`docs/superpowers/plans/2026-10-14-newsletter-phase-2-subscribers.md`). The live check ran under `netlify dev` on the developer's machine, against the live Supabase database and Resend account, with a test address and three `+` addresses on it. Every test row and contact was deleted afterwards.
+
+Plan 2 also added:
+
+- A newsletter section in the privacy policy (`/privacy-policy/#newsletter`), which the form's notice links to. Hope Trust approves its wording before the forms go live.
+- A UTF-8 byte-order mark at the start of the CSV export.
+- Formula-safe CSV cells: a cell starting with `=`, `+`, `-` or `@` gets a leading `'`, so Excel can't run it.
+
+| Check | Result |
+|---|---|
+| Resend contact calls (plan 2, Task 1) | As documented. Not found is `404` for get, update and delete. A contact can be looked up by its raw or its encoded `+` address. Creating an address that exists returns the same contact. Adding a contact that's already in the segment returns `201` (the docs don't say), which the client treats as success. Rate limit: 10 requests a second. Segment "Newsletter" created. |
+| Sign-up → confirmation email → confirm page | Pass. The sign-up sent the `/blogs/` form's fields to the function. The email arrived, and its link and the confirm button subscribed the address. A second request within 10 minutes sent no email. |
+| Confirmed row: consent recorded, contact in the Newsletter segment | Pass: `subscribed`, `website`, a consent note naming `/blogs/` and notice `2026-10`, token cleared, contact in the segment and synced. |
+| Import of 3 rows → sync → contacts in Resend | Pass: 3 added and sent to Resend, with `imported_by` and the statement recorded. The Hindi name was stored intact. |
+| Admin Unsubscribe → contact unsubscribed in Resend at once | Pass, for two addresses. |
+| Unsubscribe in Resend → Sync → row unsubscribed (source resend) | Pass. Resend's dashboard has no unsubscribe control on a contact (only edit and delete), so the contact was set to unsubscribed through the API: the same flag Resend's unsubscribe page sets. Sync then marked the row `unsubscribed` with source `resend`. |
+| Sign up again after unsubscribing → subscribed again after confirming | Pass: through the homepage card (page `/`) and the emailed link. The row became `subscribed`, source `website`, with a new consent note. |
+| Delete → contact gone, hash kept, re-import skipped | Pass. Importing the same file again added 0, skipped 2 as already on the list and 1 as deleted earlier. After clean-up, Resend's segment held no contacts and the 4 hashes stayed in `newsletter_erased`. |
+| CSV export: columns, Hindi name intact | The export ran (4 rows, written to the audit log). The user reported no problems with the file. |
+| Netlify bundles the three functions (Task 10, Step 5) | Pass: `netlify functions:build` produced the three zips, and `netlify dev` loaded and ran all three in this check. |
+
+Notes from the check:
+
+- **Answer time.** On the developer's machine each call to Supabase (ap-southeast-2) took 0.4–1.1 s. Under `netlify dev`, sign-up answers took from 3.1 s (the honeypot, which makes no calls) to 3.8 s, past the 2.5 s floor (§7.2 step 6). From Netlify's default region (us-east-2) a call takes about 0.2 s, so a new address's answer should take about 1.2 s, inside the floor. Before go-live, time a few sign-ups on the live site: a new address, a repeat and the honeypot should all answer in about 2.5 s.
+- **`netlify dev` on Windows.** With an old `out/` export in the folder, `netlify dev` sends the static file's path (with a backslash) to `next dev`, and every page returns 404. Move `out/` aside while testing locally.
