@@ -3,7 +3,7 @@
 //   POST /api/newsletter-confirm    { token }   (handleConfirm, added in Task 8)
 // Neither answer depends on whether the address is on the list.
 
-import type { z } from 'zod';
+import { z } from 'zod';
 import { buildConfirmEmail } from '../../../lib/newsletter/confirm-email';
 import {
   KNOWN_NOTICE_VERSIONS,
@@ -14,9 +14,10 @@ import {
   type SubscriberRow,
 } from '../../../lib/newsletter/subscriber';
 import { clientIp, jsonResponse, preflight, readJsonBody } from './http.mts';
-import { hashToken, newToken } from './newsletter-crypto.mts';
+import { TOKEN_PATTERN, hashEmail, hashToken, newToken } from './newsletter-crypto.mts';
 import { DuplicateEmailError } from './newsletter-db.mts';
 import type { NewsletterDeps } from './newsletter-deps.mts';
+import { pushAndRecord } from './newsletter-sync.mts';
 
 const METHODS = 'POST, OPTIONS';
 const MAX_BODY_BYTES = 4096;
@@ -184,4 +185,58 @@ async function subscribe(
     return reply({ error: "We couldn't send the confirmation email. Please try again in a minute." }, 502);
   }
   return reply(OK);
+}
+
+const confirmSchema = z.object({ token: z.string().regex(TOKEN_PATTERN) });
+
+/** How the consent was given, for the record (spec §1 "Done means" 5). */
+export function consentNote(row: SubscriberRow): string {
+  return `Website sign-up form on ${row.signup_page || 'an unknown page'} (notice ${row.signup_notice || 'unknown'}), confirmed by clicking the emailed link`;
+}
+
+export async function handleConfirm(req: Request, deps: NewsletterDeps | null): Promise<Response> {
+  const reply = (body: unknown, status = 200) => jsonResponse(body, status, METHODS);
+  if (req.method === 'OPTIONS') return preflight(METHODS);
+  if (req.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
+  if (!deps) return reply({ error: 'Server misconfiguration' }, 500);
+
+  const body = await readJsonBody(req, MAX_BODY_BYTES);
+  if (!body.ok) return reply({ error: body.error }, body.status);
+  const parsed = confirmSchema.safeParse(body.value);
+  if (!parsed.success) return reply(EXPIRED, 400);
+
+  try {
+    const { db } = deps;
+    const now = deps.now();
+    const row = await db.findByTokenHash(hashToken(parsed.data.token));
+    if (!row?.confirm_token_expires_at || Date.parse(row.confirm_token_expires_at) <= now.getTime()) {
+      return reply(EXPIRED, 400);
+    }
+
+    const confirmed = await db.update(
+      row.id,
+      {
+        status: 'subscribed',
+        source: 'website',
+        consent_at: now.toISOString(),
+        consent_note: consentNote(row),
+        unsubscribed_at: null,
+        unsubscribe_source: null,
+        confirm_token_hash: null,
+        confirm_token_expires_at: null,
+        confirm_send_count: 0,
+        resend_synced_at: null,
+      },
+      row.updated_at,
+    );
+    if (!confirmed) return reply(EXPIRED, 400); // the row changed meanwhile, e.g. a second click
+
+    await db.unErase(hashEmail(row.email)).catch((err) => console.error('[newsletter-confirm] erasure list', err));
+    // Tell Resend now. If that fails, the row stays queued and the next sync sends it.
+    await pushAndRecord(deps, confirmed).catch((err) => console.error('[newsletter-confirm] Resend', err));
+    return reply({ ok: true });
+  } catch (err) {
+    console.error('[newsletter-confirm]', err);
+    return reply({ error: 'Something went wrong. Please try again.' }, 500);
+  }
 }
