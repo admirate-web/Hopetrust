@@ -1,0 +1,187 @@
+// The public steps of signing up (spec §7.2, §7.3):
+//   POST /api/newsletter-subscribe  { full_name, email, page, notice, website }
+//   POST /api/newsletter-confirm    { token }   (handleConfirm, added in Task 8)
+// Neither answer depends on whether the address is on the list.
+
+import type { z } from 'zod';
+import { buildConfirmEmail } from '../../../lib/newsletter/confirm-email';
+import {
+  KNOWN_NOTICE_VERSIONS,
+  LIMITS,
+  SIGNUP_SUCCESS_MESSAGE,
+  signupSchema,
+  type SignupInput,
+  type SubscriberRow,
+} from '../../../lib/newsletter/subscriber';
+import { clientIp, jsonResponse, preflight, readJsonBody } from './http.mts';
+import { hashToken, newToken } from './newsletter-crypto.mts';
+import { DuplicateEmailError } from './newsletter-db.mts';
+import type { NewsletterDeps } from './newsletter-deps.mts';
+
+const METHODS = 'POST, OPTIONS';
+const MAX_BODY_BYTES = 4096;
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+export const SIGNUP_RULES = {
+  /** Different addresses that requests from one IP can trigger confirmation emails for, per window. */
+  maxAddressesPerIp: 5,
+  ipWindowMs: 15 * MINUTE,
+  /** Shortest gap between confirmation emails to one address. */
+  resendGapMs: 10 * MINUTE,
+  /** Confirmation emails one address can get without confirming, per 30 days. */
+  maxSendsPerAddress: 3,
+  sendCountWindowMs: 30 * DAY,
+  tokenLifetimeMs: 7 * DAY,
+  /** Unconfirmed sign-ups are deleted after this long: they never gave consent. */
+  pendingLifetimeMs: 30 * DAY,
+} as const;
+
+const OK = { ok: true, message: SIGNUP_SUCCESS_MESSAGE };
+export const EXPIRED = { error: 'expired', message: 'This link has expired or was already used.' };
+
+const iso = (ms: number) => new Date(ms).toISOString();
+
+/**
+ * Whether a sign-up request should send a confirmation email. A skip still
+ * gets the normal answer, so nobody learns why.
+ */
+export function signupDecision(row: SubscriberRow | null, now: Date): 'send' | 'skip' {
+  if (!row) return 'send';
+  if (row.status === 'subscribed') return 'skip';
+  const last = row.confirm_sent_at ? Date.parse(row.confirm_sent_at) : null;
+  if (last === null) return 'send';
+  const since = now.getTime() - last;
+  if (since < SIGNUP_RULES.resendGapMs) return 'skip';
+  if (since < SIGNUP_RULES.sendCountWindowMs && row.confirm_send_count >= SIGNUP_RULES.maxSendsPerAddress) return 'skip';
+  return 'send';
+}
+
+const PREVIEW_HOST = /^([a-z0-9-]+--)?hopetrust\.netlify\.app$/;
+
+/**
+ * Origin for the link in the email: the site the request came from when it is
+ * ours (production, a deploy preview, or `netlify dev`), else the main site.
+ */
+export function linkOrigin(req: Request, siteUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return siteUrl;
+  }
+  const host = url.hostname;
+  const ours =
+    url.origin === siteUrl ||
+    (url.protocol === 'https:' && (host === 'hopetrustindia.com' || PREVIEW_HOST.test(host))) ||
+    (url.protocol === 'http:' && (host === 'localhost' || host === '127.0.0.1'));
+  return ours ? url.origin : siteUrl;
+}
+
+function fieldErrors(error: z.ZodError): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? 'form');
+    if (!(field in out)) out[field] = issue.message;
+  }
+  return out;
+}
+
+function honeypotFilled(value: unknown): boolean {
+  const website = (value as { website?: unknown } | null)?.website;
+  return typeof website === 'string' && website.trim() !== '';
+}
+
+export async function handleSubscribe(req: Request, deps: NewsletterDeps | null): Promise<Response> {
+  const reply = (body: unknown, status = 200) => jsonResponse(body, status, METHODS);
+  if (req.method === 'OPTIONS') return preflight(METHODS);
+  if (req.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
+  if (!deps) return reply({ error: 'Server misconfiguration' }, 500);
+
+  const body = await readJsonBody(req, MAX_BODY_BYTES);
+  if (!body.ok) return reply({ error: body.error }, body.status);
+  if (honeypotFilled(body.value)) return reply(OK);
+
+  const parsed = signupSchema.safeParse(body.value);
+  if (!parsed.success) return reply({ error: 'Please check the form.', fields: fieldErrors(parsed.error) }, 400);
+  if (!KNOWN_NOTICE_VERSIONS.includes(parsed.data.notice)) {
+    return reply({ error: 'Please reload the page and try again.' }, 400);
+  }
+
+  try {
+    return await subscribe(req, deps, parsed.data, reply);
+  } catch (err) {
+    console.error('[newsletter-subscribe]', err);
+    return reply({ error: 'Something went wrong. Please try again.' }, 500);
+  }
+}
+
+async function subscribe(
+  req: Request,
+  deps: NewsletterDeps,
+  input: SignupInput,
+  reply: (body: unknown, status?: number) => Response,
+): Promise<Response> {
+  const { db, resend, config } = deps;
+  const now = deps.now().getTime();
+  const ip = clientIp(req);
+
+  await db
+    .deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs))
+    .catch((err) => console.error('[newsletter-subscribe] clean-up', err));
+
+  if (ip && (await db.countRecentFromIp(ip, iso(now - SIGNUP_RULES.ipWindowMs))) >= SIGNUP_RULES.maxAddressesPerIp) {
+    return reply({ error: 'Too many sign-ups from your connection. Please try again in a few minutes.' }, 429);
+  }
+
+  const existing = await db.findByEmail(input.email);
+  if (signupDecision(existing, new Date(now)) === 'skip') return reply(OK);
+
+  const token = newToken();
+  const lastSent = existing?.confirm_sent_at ? Date.parse(existing.confirm_sent_at) : null;
+  const withinWindow = lastSent !== null && now - lastSent < SIGNUP_RULES.sendCountWindowMs;
+  const fields = {
+    full_name: input.full_name,
+    signup_page: input.page,
+    signup_ip: ip,
+    signup_user_agent: (req.headers.get('user-agent') || '').slice(0, LIMITS.userAgent) || null,
+    signup_notice: input.notice,
+    confirm_token_hash: hashToken(token),
+    confirm_token_expires_at: iso(now + SIGNUP_RULES.tokenLifetimeMs),
+    confirm_sent_at: iso(now),
+    confirm_send_count: existing && withinWindow ? existing.confirm_send_count + 1 : 1,
+  };
+
+  let row: SubscriberRow | null;
+  try {
+    row = existing
+      ? await db.update(existing.id, fields)
+      : await db.insert({ email: input.email, status: 'pending', source: 'website', ...fields });
+  } catch (err) {
+    if (err instanceof DuplicateEmailError) return reply(OK); // a request for the same address got there first
+    throw err;
+  }
+  if (!row) return reply(OK);
+
+  const email = buildConfirmEmail({
+    confirmUrl: `${linkOrigin(req, config.siteUrl)}/newsletter/confirm/#t=${token}`,
+    logoUrl: `${config.imagesBase}/static/logo-v1.png`,
+  });
+  try {
+    await resend.sendEmail({ from: config.fromEmail, to: [input.email], replyTo: config.replyTo, ...email });
+  } catch (err) {
+    console.error('[newsletter-subscribe] confirmation email', err);
+    // Put the confirmation fields back: any earlier link keeps working and the
+    // person can try again at once.
+    await db
+      .update(row.id, {
+        confirm_token_hash: existing?.confirm_token_hash ?? null,
+        confirm_token_expires_at: existing?.confirm_token_expires_at ?? null,
+        confirm_sent_at: existing?.confirm_sent_at ?? null,
+        confirm_send_count: existing?.confirm_send_count ?? 0,
+      })
+      .catch(() => null);
+    return reply({ error: "We couldn't send the confirmation email. Please try again in a minute." }, 502);
+  }
+  return reply(OK);
+}
