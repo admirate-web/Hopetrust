@@ -258,9 +258,13 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     }
   }
 
+  // Errors show on the page, under the dialogs, so every failure closes its dialog.
   async function runTest(to: string[]) {
     const saved = dirty ? await save() : issue;
-    if (!saved) return;
+    if (!saved) {
+      setDialog('');
+      return;
+    }
     setBusy('testing');
     setError('');
     setNotice('');
@@ -269,6 +273,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
       setNotice(`Test sent to ${sentTo.join(', ')}.`);
       setDialog('');
     } catch (e) {
+      setDialog('');
       report(e, "The test didn't send.");
     } finally {
       setBusy('');
@@ -287,7 +292,10 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
 
   async function runSend() {
     const saved = dirty ? await save() : issue;
-    if (!saved) return;
+    if (!saved) {
+      setDialog('');
+      return;
+    }
     setError('');
     setProblems([]);
     setNotice('');

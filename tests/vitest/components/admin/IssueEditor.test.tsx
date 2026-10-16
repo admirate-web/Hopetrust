@@ -75,6 +75,8 @@ const SENT: IssueRow = {
   sent_at: '2026-10-14T10:10:00.000Z',
   sent_by: 'admin@hopetrustindia.com',
 };
+/** What the issues API answers when a save has a Share link without https:// (lib/newsletter/issue.ts). */
+const SHARE_LINK_ERROR = 'The Share link must be a web address, such as https://hopetrustindia.com/blogs/…';
 
 function open(change: Partial<IssueRow> = {}) {
   vi.mocked(api.getIssue).mockResolvedValue({ issue: { ...ISSUE, ...change }, ...ABOUT });
@@ -249,6 +251,44 @@ describe('IssueEditor', () => {
     await userEvent.click(send);
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Send now/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('asha@example.com: Invalid email');
+    expect(api.sendIssue).not.toHaveBeenCalled();
+  });
+
+  // The error shows on the page, so a dialog left open over it would hide it.
+  it("closes the test dialog to show why the test didn't send", async () => {
+    open();
+    await screen.findByLabelText('Subject');
+    vi.mocked(api.sendTestIssue).mockRejectedValue(
+      new api.IssueApiError("Resend didn't send the test: This API key can't send emails right now", 502, null, []),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Send test/ }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Send test/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Resend didn't send the test");
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes the test dialog to show why saving first failed, and sends no test', async () => {
+    open();
+    await userEvent.type(await screen.findByLabelText(/Blog link/), 'hopetrustindia.com/blogs/');
+    vi.mocked(api.saveIssue).mockRejectedValue(new api.IssueApiError(SHARE_LINK_ERROR, 400, null, []));
+    await userEvent.click(screen.getByRole('button', { name: /Send test/ }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Send test/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The Share link must be a web address');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.sendTestIssue).not.toHaveBeenCalled();
+  });
+
+  it('closes the send dialog to show why saving first failed, and sends nothing', async () => {
+    open();
+    await userEvent.type(await screen.findByLabelText(/Blog link/), 'hopetrustindia.com/blogs/');
+    vi.mocked(api.saveIssue).mockRejectedValue(new api.IssueApiError(SHARE_LINK_ERROR, 400, null, []));
+    const send = screen.getByRole('button', { name: /Send to subscribers/ });
+    await waitFor(() => expect(send).toBeEnabled());
+    await userEvent.click(send);
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Send now/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The Share link must be a web address');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.syncUntilDone).not.toHaveBeenCalled();
     expect(api.sendIssue).not.toHaveBeenCalled();
   });
 
