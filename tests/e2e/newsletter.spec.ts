@@ -17,8 +17,12 @@ test.describe('Newsletter sign-up', () => {
   test('from the footer dialog', async ({ page }) => {
     const bodies = await answerSignups(page);
     await page.goto('/contact/');
-    await page.getByRole('button', { name: 'Subscribe to our newsletter' }).click();
     const dialog = page.getByRole('dialog', { name: 'Subscribe to our newsletter' });
+    // On a cold start, a click before React hydrates the page can be lost, so retry until the dialog opens.
+    await expect(async () => {
+      if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Subscribe to our newsletter' }).click();
+      await expect(dialog.getByLabel('Full name')).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
     await dialog.getByLabel('Full name').fill('Asha Rao');
     await dialog.getByLabel('Email address').fill('asha@example.com');
     await dialog.getByRole('button', { name: 'Subscribe' }).click();
@@ -113,7 +117,72 @@ test.describe('Admin newsletter tab', () => {
     );
     await page.goto('/arel-ops/');
     await page.getByRole('button', { name: 'Newsletter' }).click();
+    await page.getByRole('tab', { name: 'Subscribers' }).click();
     await expect(page.getByRole('heading', { name: 'Newsletter subscribers' })).toBeVisible();
     await expect(page.getByText('asha@example.com')).toBeVisible();
+  });
+
+  test('writes an issue with a live preview and saves it', async ({ page }) => {
+    const payload = Buffer.from(
+      JSON.stringify({ email: 'admin@example.com', role: 'admin', exp: Math.floor(Date.now() / 1000) + 3600 }),
+    ).toString('base64');
+    await page.addInitScript((token) => {
+      sessionStorage.setItem('admin_token', token);
+      sessionStorage.setItem('admin_email', 'admin@example.com');
+    }, `e30.${payload}.signature`);
+    const issue = {
+      id: '11111111-1111-4111-8111-000000000001',
+      subject: 'October',
+      preheader: '',
+      issue_date: '2026-10-14',
+      title: 'Know Thyself',
+      hero_image_url: null,
+      hero_image_alt: '',
+      body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello readers' }] }] },
+      share_url: null,
+      status: 'draft',
+      last_error: null,
+      resend_broadcast_id: null,
+      recipient_count: null,
+      sent_at: null,
+      sent_by: null,
+      created_by: 'admin@example.com',
+      updated_by: null,
+      created_at: '2026-10-14T10:00:00.000Z',
+      updated_at: '2026-10-14T10:00:00.000Z',
+    };
+    const about = { me: 'admin@example.com', from: 'Hope Trust <newsletter@hopetrustindia.com>', subscribed: 2 };
+    let saved: Record<string, unknown> | null = null;
+    await page.route('**/api/admin-newsletter-issues**', async (route) => {
+      const request = route.request();
+      const json = (body: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      if (request.method() === 'PATCH') {
+        saved = request.postDataJSON();
+        return json({ issue: { ...issue, ...saved, updated_at: '2026-10-14T10:05:00.000Z' } });
+      }
+      if (new URL(request.url()).searchParams.get('id')) return json({ issue, ...about });
+      return json({ issues: [issue], ...about });
+    });
+
+    await page.goto('/arel-ops/');
+    await page.getByRole('button', { name: 'Newsletter' }).click();
+    await page.getByRole('button', { name: 'October' }).click();
+    const title = page.getByLabel('Title', { exact: true });
+    await expect(title).toHaveValue('Know Thyself');
+    await title.fill('Know Yourself First');
+    const preview = page.frameLocator('iframe[title="Email preview"]');
+    await expect(preview.getByText('Know Yourself First')).toBeVisible();
+
+    const body = page.getByRole('textbox', { name: 'Body' });
+    await body.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' and friends');
+    // Exact: with no preheader, the hidden inbox preview line repeats the start of the body.
+    await expect(preview.getByText('Hello readers and friends', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Saved.')).toBeVisible();
+    expect(saved).toMatchObject({ title: 'Know Yourself First', updated_at: '2026-10-14T10:00:00.000Z' });
+    expect(JSON.stringify(saved)).toContain('Hello readers and friends');
   });
 });
