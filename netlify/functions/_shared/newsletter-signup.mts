@@ -320,3 +320,17 @@ export async function handleConfirm(req: Request, deps: NewsletterDeps | null): 
     return reply({ error: 'Something went wrong. Please try again.' }, 500);
   }
 }
+
+/**
+ * Both clean-ups of spec §7.2 step 5: pending sign-ups after 30 days, and
+ * logged sign-up requests after a day. The hourly newsletter-cleanup function
+ * runs this, so the promises hold even when nobody signs up.
+ */
+export async function runCleanup(deps: NewsletterDeps): Promise<{ pending: number; requests: number }> {
+  const now = deps.now().getTime();
+  const [pending, requests] = await Promise.all([
+    deps.db.deleteStalePending(iso(now - SIGNUP_RULES.pendingLifetimeMs)),
+    deps.db.deleteRequestsBefore(iso(now - SIGNUP_RULES.requestLogLifetimeMs)),
+  ]);
+  return { pending, requests };
+}
