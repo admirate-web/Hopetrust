@@ -296,6 +296,12 @@ Delete also adds a SHA-256 hash of the address to `newsletter_erased`, which sto
   - Sending is blocked if the hero photo or its alt text is missing, the subject or title is empty, the HTML is over 95 KB, or there are no subscribers.
 - **After sending:** sent issues are read-only, with a link to the broadcast's stats in Resend. Drafts can be deleted; sent issues can't.
 
+**As built in plan 3:**
+
+- The editor keeps unsaved edits in the browser's local storage until they are saved, and offers them back when the issue is opened again.
+- A save sends every field, with the version the editor loaded. If someone else saved in between, the save is refused (409), and the editor offers Reload.
+- A sent issue links to its broadcast in Resend, where its opens and clicks are.
+
 ### 8.2 Subscribers
 
 - **Overview:** counts by status, search by name or email, filters by status and source.
@@ -319,6 +325,19 @@ Delete also adds a SHA-256 hash of the address to `newsletter_erased`, which sto
    - Not found: it goes back to `draft`.
 
    This prevents sending twice.
+
+**As built in plan 3:**
+
+- **Sync before sending:**
+  - The Send dialog first runs the full sync (pull and push) through the Subscribers API, then calls send.
+  - The send function's own sync is push-only, with a 4-second budget, so the call stays inside Netlify's 10 seconds.
+  - It won't send while any change still waits for Resend, and it names the addresses Resend refused.
+- **Check status:**
+  - The broadcast's `name` is the subject followed by `[issue <id>]`, and Check status looks for that marker.
+  - An issue still `sending` after two minutes can be checked too, for example when Netlify stopped the function.
+- **Timeout:** creating the broadcast times out after 4 seconds, and a timeout counts as an unclear outcome (step 8).
+- **Recipient count:** `recipient_count` is the number of subscribed rows after the sync, because Resend doesn't return a count.
+- **Links:** newsletter links always point at `https://hopetrustindia.com`, even when the email is rendered under `netlify dev`.
 
 ### 9.2 Test send
 
@@ -564,6 +583,8 @@ Each phase ends in a working state that can be reviewed.
 4. **Clean-up.**
    - Remove `lib/newsletter-template.ts`, `scripts/test-newsletter.mjs` and the `NEWSLETTER DISABLED` comments.
    - Update `docs/claude.md`, `.env.example` and the newsletter policies in `Database/rls-policies.sql`.
+
+Phases 3 and 4 were built in plan 3 (`docs/superpowers/plans/2026-10-14-newsletter-phase-3-issues.md`).
 
 ## 15. Risks to check early
 
