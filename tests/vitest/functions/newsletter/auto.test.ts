@@ -150,6 +150,19 @@ describe('the send', () => {
     expect(t.resend.broadcasts).toHaveLength(0);
   });
 
+  it('keeps the fortnight when switched off after the preview and on again before the send time', async () => {
+    const t = await previewed();
+    const settings = await t.deps.settings.get();
+    await t.deps.settings.save({ ...settings, auto_enabled: false }, 'admin@x');
+    t.goTo('2026-10-19T09:00:00.000Z');
+    await t.run();
+    await t.deps.settings.save({ ...settings, auto_enabled: true }, 'admin@x');
+    t.goTo(SLOT);
+    await t.run();
+    expect(t.blogRows()[0]).toMatchObject({ status: 'sent', issue_number: 1 });
+    expect(t.resend.broadcasts).toHaveLength(1);
+  });
+
   it("marks an issue whose preview never went out as missed, and doesn't send it", async () => {
     const t = await setup();
     t.issueStore.seed({ kind: 'blog', status: 'scheduled', scheduled_for: SLOT, preview_sent_at: null, subject: 'S', title: 'T' });

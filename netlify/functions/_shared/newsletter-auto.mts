@@ -38,7 +38,6 @@ const AUTO_SYNC_BUDGET_MS = 15_000;
 const STALE_SENDING_MS = 2 * 60_000;
 /** How long Resend gets to list a broadcast before "not found" counts. */
 const CHECK_AFTER_MS = 10 * 60_000;
-const FAR_FUTURE = '9999-12-31T00:00:00.000Z';
 const subscribers = (n: number) => `${n} subscriber${n === 1 ? '' : 's'}`;
 
 /** This run's clock: deps.now(), or NEWSLETTER_AUTO_NOW under `netlify dev` only (the live check). */
@@ -76,9 +75,12 @@ export async function runAutomatic(
     }
   };
 
-  // 1. Switched off: a scheduled issue goes back to the drafts, and nothing is sent.
+  const now = deps.now();
+
+  // 1. Switched off: nothing is sent, and when a scheduled issue's send time comes it goes back to
+  //    the drafts (spec §5.5 step 1). Switched on again before then, it still goes out.
   if (!settings.auto_enabled || !settings.first_send_date) {
-    for (const row of await deps.issues.overdueScheduled(FAR_FUTURE)) {
+    for (const row of await deps.issues.overdueScheduled(new Date(now.getTime() + 1).toISOString())) {
       if (await deps.issues.setOutcome(row.id, ['scheduled'], 'draft', SWITCHED_OFF)) {
         actions.push(`switched off ${row.id}`);
         await audit('NEWSLETTER_AUTO_OFF', row);
@@ -86,7 +88,6 @@ export async function runAutomatic(
     }
     return { actions };
   }
-  const now = deps.now();
 
   // 2. More than 3 hours late: missed.
   for (const row of await deps.issues.overdueScheduled(new Date(now.getTime() - LATE_LIMIT_MS).toISOString())) {
