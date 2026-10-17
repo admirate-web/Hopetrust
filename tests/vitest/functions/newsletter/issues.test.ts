@@ -593,6 +593,18 @@ describe('a scheduled blog issue', () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('Its send time has passed.');
   });
+
+  it('hands out a photo upload URL before its send time, not after', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(SCHEDULED);
+    const ok = await call(t.deps, 'POST', `?id=${issue.id}&action=upload-url`, { content_type: 'image/jpeg' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.path).toMatch(new RegExp(`^issues/${issue.id}/[0-9a-f-]{36}\\.jpg$`));
+    const late = t.issueStore.seed({ ...SCHEDULED, scheduled_for: '2026-10-14T09:00:00.000Z' });
+    const res = await call(t.deps, 'POST', `?id=${late.id}&action=upload-url`, { content_type: 'image/jpeg' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Its send time has passed.');
+  });
 });
 
 describe('a manual issue that links to a blog post', () => {

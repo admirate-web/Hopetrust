@@ -220,7 +220,11 @@ async function uploadUrl({ req, deps, id, reply }: Ctx): Promise<Response> {
   if (!parsed.success) return reply({ error: 'Only JPEG and PNG images can be uploaded.' }, 400);
   const issue = await deps.issues.get(id);
   if (!issue) return reply({ error: 'Issue not found' }, 404);
-  if (issue.status !== 'draft') return reply({ error: SENT_IS_READ_ONLY }, 409);
+  // A scheduled issue's photo can be replaced until its send time, as its other fields can (fortnightly spec §5.4).
+  if (issue.status === 'scheduled' && sendTimePassed(deps, issue.scheduled_for)) {
+    return reply({ error: SEND_TIME_PASSED, issue }, 409);
+  }
+  if (issue.status !== 'draft' && issue.status !== 'scheduled') return reply({ error: SENT_IS_READ_ONLY }, 409);
   const ext = parsed.data.content_type === 'image/png' ? 'png' : 'jpg';
   const ticket = await deps.images.createUploadUrl(`issues/${id}/${randomUUID()}.${ext}`);
   return reply({ path: ticket.path, token: ticket.token, signed_url: ticket.signedUrl, public_url: ticket.publicUrl });
