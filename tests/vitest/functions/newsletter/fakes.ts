@@ -626,7 +626,11 @@ export function createMemoryIssues(now: () => Date) {
       return blogRows(['needs_check', 'sending']).map(clone);
     },
     async lastSentAt() {
-      return sent()[0]?.sent_at ?? null;
+      const unconfirmed = Array.from(rows.values())
+        .filter((r) => r.status === 'sending' || r.status === 'needs_check')
+        .map((r) => r.updated_at);
+      const times = [sent()[0]?.sent_at, ...unconfirmed].filter((at): at is string => Boolean(at));
+      return times.length > 0 ? times.reduce((a, b) => (a >= b ? a : b)) : null;
     },
     async sentPostSlugs() {
       return sent()

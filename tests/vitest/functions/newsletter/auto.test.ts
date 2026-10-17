@@ -139,6 +139,16 @@ describe('the send', () => {
     expect(t.resend.broadcasts).toHaveLength(0);
   });
 
+  it('counts a send still unconfirmed for the 14-day gap: an unclear manual send the day before stops it', async () => {
+    const t = await previewed();
+    t.goTo('2026-10-19T10:00:00.000Z');
+    t.issueStore.seed({ status: 'needs_check', subject: 'By hand' });
+    t.goTo(SLOT);
+    await t.run();
+    expect(t.blogRows()[0]).toMatchObject({ status: 'skipped', reason: 'A newsletter went out on Mon 19 Oct, less than 14 days before.' });
+    expect(t.resend.broadcasts).toHaveLength(0);
+  });
+
   it("marks an issue whose preview never went out as missed, and doesn't send it", async () => {
     const t = await setup();
     t.issueStore.seed({ kind: 'blog', status: 'scheduled', scheduled_for: SLOT, preview_sent_at: null, subject: 'S', title: 'T' });

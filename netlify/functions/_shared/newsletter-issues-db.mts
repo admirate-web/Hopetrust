@@ -89,6 +89,11 @@ export interface IssuesDb {
   overdueScheduled(before: string): Promise<IssueRow[]>;
   /** Blog issues whose send is unconfirmed: needs_check, or sending (the caller checks how long). */
   blogNeedsCheck(): Promise<IssueRow[]>;
+  /**
+   * When the last newsletter went out, for the 14-day gap: the latest sent issue, or a send whose
+   * outcome is still unconfirmed (sending, needs_check, timed by its last change) if that is later,
+   * since it may have gone out.
+   */
   lastSentAt(): Promise<string | null>;
   sentPostSlugs(): Promise<string[]>;
   /** The hero photos of the last `n` sent issues, newest first. */
@@ -250,13 +255,17 @@ export function createIssuesDb(supabase: SupabaseClient): IssuesDb {
     },
 
     async lastSentAt() {
-      const { data, error } = await table()
-        .select('sent_at')
-        .eq('status', 'sent')
-        .order('sent_at', { ascending: false })
-        .limit(1);
-      check(error);
-      return (data?.[0] as { sent_at: string | null } | undefined)?.sent_at ?? null;
+      const [sent, unconfirmed] = await Promise.all([
+        table().select('sent_at').eq('status', 'sent').order('sent_at', { ascending: false }).limit(1),
+        table().select('updated_at').in('status', ['sending', 'needs_check']).order('updated_at', { ascending: false }).limit(1),
+      ]);
+      check(sent.error);
+      check(unconfirmed.error);
+      const times = [
+        (sent.data?.[0] as { sent_at: string | null } | undefined)?.sent_at,
+        (unconfirmed.data?.[0] as { updated_at: string } | undefined)?.updated_at,
+      ].filter((at): at is string => Boolean(at));
+      return times.length > 0 ? times.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)) : null;
     },
 
     async sentPostSlugs() {

@@ -437,6 +437,15 @@ describe('the 14-day gap and issue numbers', () => {
     expect(t.issueStore.get(t.issue.id)?.status).toBe('draft');
   });
 
+  it('counts a send still unconfirmed for the gap, so a manual send right after an unclear automatic one is refused', async () => {
+    const t = ready();
+    t.issueStore.seed({ ...READY, kind: 'blog', status: 'needs_check', scheduled_for: '2026-10-14T04:30:00.000Z', issue_number: 1 });
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('The next newsletter can go out on Wed 28 Oct.');
+    expect(t.resend.broadcasts).toHaveLength(0);
+  });
+
   it('numbers a send one after the highest number given', async () => {
     const t = ready();
     t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-09-01T10:00:00.000Z', issue_number: 4 });

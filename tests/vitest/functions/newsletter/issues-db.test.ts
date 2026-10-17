@@ -132,6 +132,27 @@ describe('createIssuesDb queries', () => {
     expect(await createIssuesDb(taken.client).createBlog(BLOG)).toBeNull();
   });
 
+  it('takes the last send from sent issues, or from a send still unconfirmed when that is later', async () => {
+    const { client, calls } = recording({
+      data: [{ sent_at: '2026-10-06T04:31:00.000Z', updated_at: '2026-10-19T10:00:00.000Z' }],
+      error: null,
+    });
+    expect(await createIssuesDb(client).lastSentAt()).toBe('2026-10-19T10:00:00.000Z');
+    expect(calls).toEqual([
+      ['from', 'newsletter_issues'],
+      ['select', 'sent_at'],
+      ['eq', 'status', 'sent'],
+      ['order', 'sent_at', { ascending: false }],
+      ['limit', 1],
+      ['from', 'newsletter_issues'],
+      ['select', 'updated_at'],
+      ['in', 'status', ['sending', 'needs_check']],
+      ['order', 'updated_at', { ascending: false }],
+      ['limit', 1],
+    ]);
+    expect(await createIssuesDb(recording({ data: [], error: null }).client).lastSentAt()).toBeNull();
+  });
+
   it('claims a preview only while no run has claimed it', async () => {
     const { client, calls } = recording({ data: [{ id: 'id-1' }], error: null });
     expect(await createIssuesDb(client).claimPreview('id-1', '2026-10-18T04:30:00.000Z')).toBe(true);
