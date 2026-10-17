@@ -3,7 +3,9 @@
   publish = "out"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # 24: the build starts with scripts/newsletter-posts.mts, which needs Node's
+  # built-in TypeScript (22.18+). It's also the version the functions run on.
+  NODE_VERSION = "24"
   NPM_FLAGS = "--production=false"
 
 [dev]
