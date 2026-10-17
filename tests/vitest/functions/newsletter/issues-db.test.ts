@@ -38,6 +38,9 @@ const DRAFT = {
   hero_image_alt: '',
   body: { type: 'doc' as const, content: [] },
   share_url: null,
+  kicker: '',
+  intro: '',
+  question: '',
 };
 
 const SLOT = '2026-10-20T04:30:00.000Z';
