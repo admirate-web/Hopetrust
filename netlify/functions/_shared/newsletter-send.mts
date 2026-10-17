@@ -39,6 +39,12 @@ export async function sendLocked(
     ...(problems ? { problems } : {}),
     issue: await deps.issues.backToDraft(id, error),
   });
+  /** Nothing went out and it may work later: the automatic send goes back to scheduled, and the next run tries again until the 3-hour limit (fortnightly spec §5.6). */
+  const retry = async (error: string): Promise<SendOutcome> => ({
+    kind: 'retry',
+    error,
+    issue: await deps.issues.backToDraft(id, error, 'scheduled'),
+  });
 
   let html = '';
   let subscribed = 0;
@@ -59,7 +65,8 @@ export async function sendLocked(
     if (problems.length > 0) return await blocked(400, problems.join(' '), problems);
   } catch (err) {
     console.error('[newsletter-send] before sending', err);
-    return blocked(502, `Nothing was sent: ${errorText(err)}. Try again in a minute.`);
+    const error = `Nothing was sent: ${errorText(err)}. Try again in a minute.`;
+    return opts.retryTo === 'scheduled' ? retry(error) : blocked(502, error);
   }
 
   let broadcastId: string;
@@ -74,6 +81,10 @@ export async function sendLocked(
     });
   } catch (err) {
     console.error('[newsletter-send] send', err);
+    if (err instanceof ResendError && err.status === 429 && opts.retryTo === 'scheduled') {
+      // Too busy, even after the client's own retry: nothing went out.
+      return retry(`Resend was too busy to take the newsletter, so nothing was sent: ${err.message}.`);
+    }
     if (err instanceof ResendError && err.status >= 400 && err.status < 500) {
       // Resend said no, so nothing went out.
       return blocked(502, `Resend refused the newsletter, so nothing was sent: ${err.message}`);

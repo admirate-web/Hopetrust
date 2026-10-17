@@ -4,6 +4,7 @@
 // (10:00 India), the send is Tue 20 Oct 04:30 UTC, and it may run until 07:30.
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { runAutomatic } from '@/netlify/functions/_shared/newsletter-auto.mts';
+import { ResendError } from '@/netlify/functions/_shared/resend.mts';
 import { DEFAULT_SETTINGS } from '@/lib/newsletter/settings';
 import { POSTS, makeDeps } from './fakes';
 
@@ -175,6 +176,33 @@ describe('the send', () => {
     await t.run();
     expect(t.blogRows()[0]).toMatchObject({ status: 'draft', last_error: 'Add an intro.' });
     expect(t.subjects()[1]).toBe('[The Hope Letter] Not sent: Add an intro.');
+  });
+
+  it('tries again on the next run when something fails before the broadcast, and sends then', async () => {
+    const t = await previewed();
+    t.goTo(SLOT);
+    t.resend.failNext('listSegmentContacts');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await t.run();
+    expect(t.blogRows()[0]).toMatchObject({ status: 'scheduled', last_error: 'Nothing was sent: Resend is down. Try again in a minute.' });
+    expect(t.resend.broadcasts).toHaveLength(0);
+    t.goTo('2026-10-20T04:45:00.000Z');
+    await t.run();
+    expect(t.blogRows()[0]).toMatchObject({ status: 'sent', issue_number: 1 });
+    expect(t.resend.broadcasts).toHaveLength(1);
+  });
+
+  it('tries again on the next run when Resend is too busy to take the broadcast (429)', async () => {
+    const t = await previewed();
+    t.goTo(SLOT);
+    t.resend.failNext('sendBroadcast', new ResendError(429, 'rate_limit_exceeded', 'Too many requests'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await t.run();
+    expect(t.blogRows()[0].status).toBe('scheduled');
+    t.goTo('2026-10-20T04:45:00.000Z');
+    await t.run();
+    expect(t.blogRows()[0].status).toBe('sent');
+    expect(t.resend.broadcasts).toHaveLength(1);
   });
 
   it("leaves an unclear send for the next run, which finds it in Resend's list", async () => {
