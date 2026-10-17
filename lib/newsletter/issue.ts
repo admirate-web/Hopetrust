@@ -5,7 +5,14 @@
 
 import { z } from 'zod';
 import type { BlockNode, BodyDoc, InlineNode, IssueForRender, ListItemNode, Mark, ParagraphNode } from './content';
-import { SIZE_MAX_BYTES, UNSUBSCRIBE_PLACEHOLDER, allowedImageUrl, resolveHref, type RenderOptions } from './render';
+import {
+  SIZE_MAX_BYTES,
+  UNSUBSCRIBE_PLACEHOLDER,
+  allowedImageUrl,
+  resolveHref,
+  type BookPanel,
+  type RenderOptions,
+} from './render';
 
 export type IssueStatus = 'draft' | 'sending' | 'sent' | 'needs_check' | 'scheduled' | 'skipped' | 'missed';
 export type IssueKind = IssueForRender['kind'];
@@ -291,16 +298,32 @@ export function draftKey(draft: unknown): string {
   return JSON.stringify(parsed.success ? parsed.data : draft);
 }
 
-/** How the preview and the functions render an issue: logo and icons from static/, photos from anywhere in the bucket. */
-export function issueRenderOptions(imagesBase: string, mode: RenderOptions['mode']): RenderOptions {
+/**
+ * How the preview and the functions render an issue: the logo from static/;
+ * photos from the bucket, or a blog post's photo on Unsplash or the site
+ * (fortnightly spec §4.1).
+ */
+export function issueRenderOptions(
+  imagesBase: string,
+  mode: RenderOptions['mode'],
+  extra: { panel?: BookPanel | null; nextIssueNumber?: number | null } = {},
+): RenderOptions {
   const base = imagesBase.replace(/\/+$/, '');
-  return { mode, siteUrl: NEWSLETTER_SITE_URL, assetBaseUrl: `${base}/static`, imagePrefixes: [`${base}/`] };
+  return {
+    mode,
+    siteUrl: NEWSLETTER_SITE_URL,
+    assetBaseUrl: `${base}/static`,
+    imagePrefixes: [`${base}/`, 'https://images.unsplash.com/', `${NEWSLETTER_SITE_URL}/`],
+    panel: extra.panel ?? null,
+    nextIssueNumber: extra.nextIssueNumber ?? null,
+  };
 }
 
 export const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 export interface SendCheck {
-  issue: Pick<IssueForRender, 'subject' | 'title' | 'hero_image_url' | 'hero_image_alt'>;
+  issue: Pick<IssueForRender, 'subject' | 'title' | 'hero_image_url' | 'hero_image_alt'> &
+    Partial<Pick<IssueForRender, 'kind' | 'intro'>>;
   /** The send version of the HTML, and its size. */
   html: string;
   bytes: number;
@@ -313,6 +336,7 @@ export function sendProblems({ issue, html, bytes, subscribed, imagePrefixes }: 
   const problems: string[] = [];
   if (!issue.subject.trim()) problems.push('Add a subject.');
   if (!issue.title.trim()) problems.push('Add a title.');
+  if (issue.kind === 'blog' && !String(issue.intro ?? '').trim()) problems.push('Add an intro.');
   if (!allowedImageUrl(issue.hero_image_url, imagePrefixes)) problems.push('Add a hero photo.');
   if (!issue.hero_image_alt.trim()) problems.push("Describe the hero photo for people who can't see it.");
   if (bytes > SIZE_MAX_BYTES) {

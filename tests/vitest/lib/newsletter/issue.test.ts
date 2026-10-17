@@ -200,13 +200,20 @@ describe('draftKey', () => {
 });
 
 describe('issueRenderOptions', () => {
-  it('takes the logo from static/, photos from anywhere in the bucket, and links to the live site', () => {
+  it('takes the logo from static/, photos from the bucket, Unsplash or the site, and links to the live site', () => {
     expect(issueRenderOptions(`${IMAGES}/`, 'preview')).toEqual({
       mode: 'preview',
       siteUrl: 'https://hopetrustindia.com',
       assetBaseUrl: `${IMAGES}/static`,
-      imagePrefixes: [`${IMAGES}/`],
+      imagePrefixes: [`${IMAGES}/`, 'https://images.unsplash.com/', 'https://hopetrustindia.com/'],
+      panel: null,
+      nextIssueNumber: null,
     });
+  });
+
+  it('carries the book panel and the next issue number when given', () => {
+    const panel = { eyebrow: 'From Rahul Luther', title: 'I, Bhogi', text: 'A memoir.', linkText: 'Discover the book →', url: 'https://example.com' };
+    expect(issueRenderOptions(IMAGES, 'test', { panel, nextIssueNumber: 4 })).toMatchObject({ panel, nextIssueNumber: 4 });
   });
 });
 
@@ -239,6 +246,19 @@ describe('sendProblems', () => {
       'The email is 96.0 KB, over the 95.0 KB limit. Shorten it or remove an image.',
       'The email is missing its Unsubscribe link.',
       'There are no subscribers to send to.',
+    ]);
+  });
+
+  it('asks a blog issue for an intro, and accepts a post photo from Unsplash', () => {
+    const blogIssue = {
+      ...ready,
+      kind: 'blog' as const,
+      intro: ' ',
+      hero_image_url: 'https://images.unsplash.com/photo-1?w=1200&h=750&fit=crop&fm=jpg&q=80',
+    };
+    const { html, bytes } = renderIssueHtml(blogIssue as IssueForRender, opts);
+    expect(sendProblems({ issue: blogIssue, html, bytes, subscribed: 3, imagePrefixes: opts.imagePrefixes })).toEqual([
+      'Add an intro.',
     ]);
   });
 });

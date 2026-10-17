@@ -24,7 +24,7 @@ describe('renderBodyHtml', () => {
       '<p style="margin:0 0 16px 0;">Know <em style="font-style:italic;"><strong style="font-weight:700;">thyself</strong></em>',
     );
     expect(html).toContain(
-      '<a href="https://hopetrustindia.com/blogs/x/?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=2026-10-13" style="color:#EE7429;text-decoration:underline;"> — read more</a></p>',
+      '<a href="https://hopetrustindia.com/blogs/x/?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=2026-10-13" style="color:#00373E;text-decoration:underline;"> — read more</a></p>',
     );
   });
 
@@ -61,7 +61,7 @@ describe('renderBodyHtml', () => {
     expect(html).toContain('मन शांत है<br>🌿');
   });
 
-  it('centres level-2 headings, keeps level-3 headings left, and skips empty headings', () => {
+  it('sets headings in the design serif, left-aligned, and skips empty headings', () => {
     const html = renderBodyHtml(
       doc(
         { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'You are a River' }] },
@@ -70,7 +70,8 @@ describe('renderBodyHtml', () => {
       ),
       opts,
     );
-    expect(html).toMatch(/<h2 [^>]*text-align:center;[^>]*>You are a River<\/h2>/);
+    expect(html).toMatch(/<h2 [^>]*Georgia[^>]*>You are a River<\/h2>/);
+    expect(html).not.toContain('text-align:center');
     expect(html).toMatch(/<h3 [^>]*>Humour Helps<\/h3>/);
     expect(html.match(/<h2 /g)).toHaveLength(1);
   });
@@ -102,7 +103,7 @@ describe('renderBodyHtml', () => {
     );
   });
 
-  it('renders a pull-quote as an orange block with white links', () => {
+  it('renders a pull-quote as the question box', () => {
     const html = renderBodyHtml(
       doc({
         type: 'blockquote',
@@ -118,14 +119,14 @@ describe('renderBodyHtml', () => {
       }),
       opts,
     );
-    expect(html).toContain('bgcolor="#EE7429"');
+    expect(html).toContain('bgcolor="#F7F5EF" style="background-color:#F7F5EF;border-left:3px solid #ED7428;');
     expect(html).toContain(
-      '“I am large, &amp; I contain multitudes.”<br><br><a href="https://en.wikipedia.org/wiki/Walt_Whitman" style="color:#FFFFFF;text-decoration:underline;">Walt Whitman</a>',
+      '“I am large, &amp; I contain multitudes.”<br><br><a href="https://en.wikipedia.org/wiki/Walt_Whitman" style="color:#00373E;text-decoration:underline;">Walt Whitman</a>',
     );
   });
 
-  it('renders a divider as an orange rule', () => {
-    expect(renderBodyHtml(doc({ type: 'horizontalRule' }), opts)).toContain('border-top:2px solid #EE7429;');
+  it('renders a divider as a thin rule', () => {
+    expect(renderBodyHtml(doc({ type: 'horizontalRule' }), opts)).toContain('border-top:1px solid #D8DEDA;');
   });
 
   it('shows bucket images with their alt text and skips images from anywhere else', () => {
@@ -136,7 +137,7 @@ describe('renderBodyHtml', () => {
       ),
       opts,
     );
-    expect(html).toContain(`<img src="${IMAGES}/issues/river.jpg" alt="A mountain river" width="520"`);
+    expect(html).toContain(`<img src="${IMAGES}/issues/river.jpg" alt="A mountain river" width="560"`);
     expect(html).not.toContain('evil.example');
   });
 
