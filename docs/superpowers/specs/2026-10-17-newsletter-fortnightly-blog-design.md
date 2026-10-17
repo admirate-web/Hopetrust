@@ -353,3 +353,25 @@ None left. On 17 Oct 2026 the user answered both:
 - how the WebP site images get JPEG copies;
 - table, column and constraint names;
 - how the chosen design's HTML becomes the renderer's template.
+
+## 13. Results
+
+Recorded 18 Oct 2026, from plan 4 (`docs/superpowers/plans/2026-10-17-newsletter-fortnightly-blog.md`). The live check ran under `netlify dev` against the live Supabase project and Resend account. The function was run by hand with `NEWSLETTER_AUTO_NOW` set to the preview time (Sun 18 Oct, 10:01) and then the send time (Tue 20 Oct, 10:01). The preview list and the one test subscriber were both essentials@admirate.in.
+
+| Check | Result |
+|---|---|
+| Whole vitest suite | 805 pass; the 7 failures are the known ones (Header 1, contact page 6) |
+| `tsc --noEmit` / functions type-check | 0 errors / 12, the baseline |
+| `npm run build` | Passes locally on Node 24, and on Netlify: PR #24's deploy preview built with `NODE_VERSION = "24"` and serves the newsletter pages |
+| Final review | Fresh reviewer (Opus) over the plan 4 diff: 1 Critical (Netlify built on Node 20, which can't run the build's first step), 7 Important, and the email width (640 → 600 px, §4). All fixed, each with a test that failed first |
+| SQL section 7 | Applied by hand. Read-only checks: the new columns select, the settings row has essentials@admirate.in, and the anon key is refused (42501) on both tables |
+| Round logo | Uploaded; `static/logo-round-v1.png` returns 200 `image/png` |
+| Manual issue | Made, saved and test-sent from `/arel-ops`; arrived and looked right |
+| Preview | At the preview time, the run scheduled the newest post with a photo (an Unsplash JPEG, 1200×750) and emailed the preview |
+| Editing a scheduled issue | The question saved; Replace photo uploaded to `issues/<id>/` (1200×788) |
+| First send | **Refused by Resend:** "Field `name` has a maximum of 70 items". The broadcast name (subject + issue marker) was 102 characters. Nothing went out; the issue went back to draft and staff got the "Not sent" note, as designed. Fixed: the subject is cut at a word so the name fits 70, and the marker stays whole |
+| Send after the fix | Sent to 1 subscriber as Issue 01, with the italic title part, the edited question and the new photo; links, share buttons and the "Sent to 1 subscriber" note all worked |
+| Gmail "Show original" | SPF, DKIM and DMARC, and the `List-Unsubscribe` headers: reported fine |
+| Unsubscribe | The footer link opened Resend's page and unsubscribed the contact; Sync with Resend then showed the row unsubscribed |
+| Skip note on a second fortnight | Not run live. It goes through the same note email as "Not sent" and "Sent", which both arrived, and the unit tests cover the skip logic |
+| Clean-up | Automatic sending off; the test issues and their photos deleted, so the first real issue is Issue 01; `out/` restored |
