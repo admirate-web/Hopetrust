@@ -188,7 +188,17 @@ export interface IssueDetail extends IssueContext {
 
 export type IssueDraftInput = Pick<
   IssueRow,
-  'subject' | 'preheader' | 'issue_date' | 'title' | 'hero_image_url' | 'hero_image_alt' | 'body' | 'share_url'
+  | 'subject'
+  | 'preheader'
+  | 'issue_date'
+  | 'title'
+  | 'hero_image_url'
+  | 'hero_image_alt'
+  | 'body'
+  | 'share_url'
+  | 'kicker'
+  | 'intro'
+  | 'question'
 >;
 
 export interface UploadTicket {

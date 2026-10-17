@@ -85,6 +85,20 @@ export interface IssueForRender {
   hero_image_url: string | null;
   hero_image_alt: string;
   body: BodyDoc;
-  /** Blog link the Share button sends; null means https://hopetrustindia.com/blogs/ */
+  /** The article link: Read the article and the share buttons use it; null means https://hopetrustindia.com/blogs/ */
   share_url: string | null;
+  /** 'blog' issues are built from a blog post (an intro and Read the article); 'manual' ones are written in the editor. */
+  kind: 'manual' | 'blog';
+  /** The short label above the title. */
+  kicker: string;
+  /** A blog issue's intro paragraph. */
+  intro: string;
+  /** "A question to take with you"; the box shows only when it isn't empty. */
+  question: string;
+  /** A blog issue's reading time; manual issues work it out from the body. */
+  reading_minutes: number | null;
+  /** Given when the send starts; previews show the next number instead. */
+  issue_number: number | null;
+  /** The blog post a blog issue features, or the one a manual issue's article link points at. */
+  post_slug: string | null;
 }

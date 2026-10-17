@@ -174,3 +174,59 @@ comment on table public.newsletter_issues is
 
 alter table public.newsletter_issues enable row level security;
 revoke all on table public.newsletter_issues from anon, authenticated;
+
+-- 7. The Hope Letter (docs/superpowers/specs/2026-10-17-newsletter-fortnightly-blog-design.md
+--    §5, §7): every other Tuesday a blog post goes out on its own, after a
+--    preview to staff 48 hours before. One blog row per send time (a unique
+--    index), so two overlapping runs can't preview or send twice. The issue
+--    number is given when a send starts. The settings are one row. Access as
+--    in section 4. Safe to run again.
+alter table public.newsletter_issues
+  add column if not exists kind            text not null default 'manual' check (kind in ('manual', 'blog')),
+  add column if not exists post_slug       text check (post_slug is null or char_length(post_slug) <= 200),
+  add column if not exists kicker          text not null default '' check (char_length(kicker) <= 60),
+  add column if not exists intro           text not null default '' check (char_length(intro) <= 600),
+  add column if not exists question        text not null default '' check (char_length(question) <= 200),
+  add column if not exists reading_minutes int check (reading_minutes is null or reading_minutes between 1 and 120),
+  add column if not exists issue_number    int check (issue_number is null or issue_number > 0),
+  add column if not exists scheduled_for   timestamptz,
+  add column if not exists preview_sent_at timestamptz,
+  add column if not exists reason          text check (reason is null or char_length(reason) <= 500);
+
+alter table public.newsletter_issues drop constraint if exists newsletter_issues_status_check;
+alter table public.newsletter_issues add constraint newsletter_issues_status_check
+  check (status in ('draft', 'sending', 'sent', 'needs_check', 'scheduled', 'skipped', 'missed'));
+
+create unique index if not exists newsletter_issues_blog_slot_idx
+  on public.newsletter_issues (scheduled_for) where kind = 'blog';
+create unique index if not exists newsletter_issues_number_idx
+  on public.newsletter_issues (issue_number) where issue_number is not null;
+
+create table if not exists public.newsletter_settings (
+  id                 boolean primary key default true check (id),
+  auto_enabled       boolean not null default false,
+  first_send_date    date check (first_send_date is null or extract(isodow from first_send_date) = 2),
+  preview_recipients text[] not null default array['essentials@admirate.in']::text[]
+                       check (cardinality(preview_recipients) between 1 and 5),
+  panel_enabled      boolean not null default false,
+  panel_eyebrow      text not null default '' check (char_length(panel_eyebrow) <= 80),
+  panel_title        text not null default '' check (char_length(panel_title) <= 80),
+  panel_text         text not null default '' check (char_length(panel_text) <= 200),
+  panel_link_text    text not null default '' check (char_length(panel_link_text) <= 40),
+  panel_url          text not null default '' check (char_length(panel_url) <= 1000),
+  updated_by         text,
+  updated_at         timestamptz not null default now()
+);
+
+drop trigger if exists newsletter_settings_updated_at on public.newsletter_settings;
+create trigger newsletter_settings_updated_at
+  before update on public.newsletter_settings
+  for each row execute function set_updated_at();
+
+insert into public.newsletter_settings (id) values (true) on conflict (id) do nothing;
+
+comment on table public.newsletter_settings is
+  'The Hope Letter settings, one row: automatic sending, its first send date, the preview recipients and the optional book panel. Written only by the admin-newsletter-issues Netlify function.';
+
+alter table public.newsletter_settings enable row level security;
+revoke all on table public.newsletter_settings from anon, authenticated;

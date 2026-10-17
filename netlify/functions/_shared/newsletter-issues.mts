@@ -108,6 +108,9 @@ async function create({ deps, admin, reply }: Ctx): Promise<Response> {
       hero_image_alt: '',
       body: EMPTY_BODY,
       share_url: null,
+      kicker: '',
+      intro: '',
+      question: '',
     },
     admin.email,
   );
@@ -214,7 +217,7 @@ async function testSend({ req, deps, admin, id, reply }: Ctx): Promise<Response>
  * for Check status, so an issue can never go out twice.
  */
 async function send({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
-  const locked = await deps.issues.lockForSend(id, admin.email);
+  const locked = await deps.issues.lockForSend(id, admin.email, await deps.issues.nextIssueNumber(), 'draft');
   if (!locked) {
     const current = await deps.issues.get(id);
     if (!current) return reply({ error: 'Issue not found' }, 404);

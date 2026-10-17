@@ -7,12 +7,19 @@ import { z } from 'zod';
 import type { BlockNode, BodyDoc, InlineNode, IssueForRender, ListItemNode, Mark, ParagraphNode } from './content';
 import { SIZE_MAX_BYTES, UNSUBSCRIBE_PLACEHOLDER, allowedImageUrl, resolveHref, type RenderOptions } from './render';
 
-export type IssueStatus = 'draft' | 'sending' | 'sent' | 'needs_check';
+export type IssueStatus = 'draft' | 'sending' | 'sent' | 'needs_check' | 'scheduled' | 'skipped' | 'missed';
+export type IssueKind = IssueForRender['kind'];
 
-/** A row of newsletter_issues (Database/newsletter.sql §6), as the admin API returns it. */
+/** A row of newsletter_issues (Database/newsletter.sql §6–7), as the admin API returns it. */
 export interface IssueRow extends IssueForRender {
   id: string;
   status: IssueStatus;
+  /** A blog issue's send time. */
+  scheduled_for: string | null;
+  /** When a run claimed the preview email; a blog issue is sent only once this is set. */
+  preview_sent_at: string | null;
+  /** Why a blog issue was skipped or missed, or went back to a draft. */
+  reason: string | null;
   last_error: string | null;
   resend_broadcast_id: string | null;
   recipient_count: number | null;
@@ -27,7 +34,17 @@ export interface IssueRow extends IssueForRender {
 /** What the Issues list shows (spec §8.1). */
 export type IssueSummary = Pick<
   IssueRow,
-  'id' | 'subject' | 'issue_date' | 'status' | 'recipient_count' | 'sent_at' | 'last_error' | 'updated_at'
+  | 'id'
+  | 'subject'
+  | 'issue_date'
+  | 'status'
+  | 'recipient_count'
+  | 'sent_at'
+  | 'last_error'
+  | 'updated_at'
+  | 'kind'
+  | 'scheduled_for'
+  | 'reason'
 >;
 
 export const ISSUE_LIMITS = {
@@ -35,6 +52,9 @@ export const ISSUE_LIMITS = {
   preheader: 200,
   title: 160,
   heroAlt: 250,
+  kicker: 60,
+  intro: 600,
+  question: 200,
   url: 1000,
   /** The body as JSON: far above any real issue, which must also render under 95 KB. */
   bodyJsonBytes: 300_000,
@@ -241,6 +261,9 @@ export const issueDraftSchema = z.object({
   share_url: optionalUrl('The Share link must be a web address, such as https://hopetrustindia.com/blogs/…', (value) =>
     /^https?:/i.test(resolveHref(value, NEWSLETTER_SITE_URL) ?? ''),
   ),
+  kicker: line(ISSUE_LIMITS.kicker, 'The kicker').default(''),
+  intro: line(ISSUE_LIMITS.intro, 'The intro').default(''),
+  question: line(ISSUE_LIMITS.question, 'The question').default(''),
 });
 
 export type IssueDraft = z.infer<typeof issueDraftSchema>;
@@ -256,6 +279,9 @@ export function toDraft(issue: IssueForRender): IssueDraft {
     hero_image_alt: issue.hero_image_alt,
     body: issue.body,
     share_url: issue.share_url,
+    kicker: issue.kicker ?? '',
+    intro: issue.intro ?? '',
+    question: issue.question ?? '',
   };
 }
 

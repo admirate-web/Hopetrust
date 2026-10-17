@@ -56,5 +56,12 @@ export function buildSampleIssue(imagesBase: string): IssueForRender {
     hero_image_alt: 'A young person talking with a counsellor in a bright living room',
     body,
     share_url: 'https://hopetrustindia.com/blogs/the-most-important-connection-you-can-have-with-yourself/',
+    kind: 'manual',
+    kicker: '',
+    intro: '',
+    question: '',
+    reading_minutes: null,
+    issue_number: null,
+    post_slug: null,
   };
 }

@@ -154,6 +154,9 @@ describe('issueDraftSchema', () => {
     [{ issue_date: '14/10/2026' }, 'Choose the issue date.'],
     [{ share_url: 'javascript:alert(1)' }, 'The Share link must be a web address, such as https://hopetrustindia.com/blogs/…'],
     [{ hero_image_url: 'http://example.com/a.jpg' }, 'The hero photo must be an uploaded image.'],
+    [{ kicker: 'x'.repeat(61) }, 'The kicker can be at most 60 characters.'],
+    [{ intro: 'x'.repeat(601) }, 'The intro can be at most 600 characters.'],
+    [{ question: 'x'.repeat(201) }, 'The question can be at most 200 characters.'],
   ])('rejects %o', (change, message) => {
     const result = issueDraftSchema.safeParse({ ...valid, ...change });
     expect(result.success).toBe(false);
@@ -163,6 +166,28 @@ describe('issueDraftSchema', () => {
   it('accepts a Share link on the site or anywhere on the web', () => {
     expect(issueDraftSchema.parse({ ...valid, share_url: '/blogs/know-thyself/' }).share_url).toBe('/blogs/know-thyself/');
     expect(issueDraftSchema.parse({ ...valid, share_url: 'https://example.com/a' }).share_url).toBe('https://example.com/a');
+  });
+
+  it('keeps the kicker, intro and question trimmed, and empty when a save leaves them out', () => {
+    expect(issueDraftSchema.parse(valid)).toMatchObject({ kicker: '', intro: '', question: '' });
+    const parsed = issueDraftSchema.parse({
+      ...valid,
+      kicker: '  A moment for yourself ',
+      intro: ' Before you can love, trust or know another person.\n',
+      question: ' What would change? ',
+    });
+    expect(parsed).toMatchObject({
+      kicker: 'A moment for yourself',
+      intro: 'Before you can love, trust or know another person.',
+      question: 'What would change?',
+    });
+  });
+});
+
+describe('toDraft', () => {
+  it('includes the kicker, intro and question', () => {
+    const issue = { ...valid, kicker: 'K', intro: 'I', question: 'Q' } as unknown as IssueForRender;
+    expect(toDraft(issue)).toMatchObject({ kicker: 'K', intro: 'I', question: 'Q' });
   });
 });
 

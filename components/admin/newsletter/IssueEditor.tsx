@@ -213,7 +213,10 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     const timer = setTimeout(() => setPreviewSource(draft), 250);
     return () => clearTimeout(timer);
   }, [draft]);
-  const preview = useMemo(() => (previewSource ? renderPreview(previewSource) : null), [previewSource]);
+  const preview = useMemo(
+    () => (previewSource && issue ? renderPreview({ ...issue, ...previewSource }) : null),
+    [previewSource, issue],
+  );
   const blockers = useMemo(
     () =>
       preview && previewSource && about

@@ -440,6 +440,25 @@ export function createMemoryIssues(now: () => Date) {
     sent_at: null,
     sent_by: null,
   };
+  /** Section 7's column defaults. */
+  const plain = {
+    kind: 'manual' as const,
+    post_slug: null,
+    kicker: '',
+    intro: '',
+    question: '',
+    reading_minutes: null,
+    issue_number: null,
+    scheduled_for: null,
+    preview_sent_at: null,
+    reason: null,
+  };
+  const blogRows = (status: IssueStatus[]) =>
+    Array.from(rows.values()).filter((r) => r.kind === 'blog' && status.includes(r.status));
+  const sent = () =>
+    Array.from(rows.values())
+      .filter((r) => r.status === 'sent')
+      .sort((a, b) => String(b.sent_at).localeCompare(String(a.sent_at)));
 
   /** Changes a row only while it is in one of `from` (and unchanged since `ifUpdatedAt`), like the real update. */
   function guarded(id: string, from: IssueStatus[], patch: Partial<IssueRow>, ifUpdatedAt?: string): IssueRow | null {
@@ -459,6 +478,9 @@ export function createMemoryIssues(now: () => Date) {
     sent_at: r.sent_at,
     last_error: r.last_error,
     updated_at: r.updated_at,
+    kind: r.kind,
+    scheduled_for: r.scheduled_for,
+    reason: r.reason,
   });
 
   const issues: IssuesDb = {
@@ -474,6 +496,7 @@ export function createMemoryIssues(now: () => Date) {
     async create(fields, actor) {
       const at = stamp();
       const row: IssueRow = {
+        ...plain,
         ...clone(fields),
         ...blank,
         id: nextId(),
@@ -487,23 +510,81 @@ export function createMemoryIssues(now: () => Date) {
       return clone(row);
     },
     async saveDraft(id, fields, actor, ifUpdatedAt) {
-      return guarded(id, ['draft'], { ...fields, updated_by: actor }, ifUpdatedAt);
+      return guarded(id, ['draft', 'scheduled'], { ...fields, updated_by: actor }, ifUpdatedAt);
     },
     async deleteDraft(id) {
       if (rows.get(id)?.status !== 'draft') return false;
       return rows.delete(id);
     },
-    async lockForSend(id, actor) {
-      return guarded(id, ['draft'], { status: 'sending', sent_by: actor, last_error: null });
+    async lockForSend(id, actor, issueNumber, from) {
+      return guarded(id, [from], { status: 'sending', sent_by: actor, last_error: null, issue_number: issueNumber });
     },
     async markSent(id, fields) {
       return guarded(id, ['sending', 'needs_check'], { ...fields, status: 'sent', last_error: null });
     },
-    async backToDraft(id, error) {
-      return guarded(id, ['sending', 'needs_check'], { status: 'draft', sent_by: null, last_error: error });
+    async backToDraft(id, error, to = 'draft') {
+      return guarded(id, ['sending', 'needs_check'], { status: to, sent_by: null, last_error: error, issue_number: null });
     },
     async markNeedsCheck(id, error) {
       return guarded(id, ['sending'], { status: 'needs_check', last_error: error });
+    },
+    async createBlog(fields) {
+      if (Array.from(rows.values()).some((r) => r.kind === 'blog' && r.scheduled_for === fields.scheduled_for)) return null;
+      const at = stamp();
+      const row: IssueRow = {
+        ...plain,
+        ...clone(fields),
+        ...blank,
+        id: nextId(),
+        created_by: 'automatic',
+        updated_by: 'automatic',
+        created_at: at,
+        updated_at: at,
+      };
+      rows.set(row.id, row);
+      return clone(row);
+    },
+    async blogSlot(scheduledFor) {
+      const row = Array.from(rows.values()).find((r) => r.kind === 'blog' && r.scheduled_for === scheduledFor);
+      return row ? clone(row) : null;
+    },
+    async claimPreview(id, at) {
+      const row = rows.get(id);
+      if (!row || row.preview_sent_at !== null) return false;
+      rows.set(id, { ...row, preview_sent_at: at, updated_at: stamp() });
+      return true;
+    },
+    async releasePreview(id) {
+      const row = rows.get(id);
+      if (row) rows.set(id, { ...row, preview_sent_at: null, updated_at: stamp() });
+    },
+    async setOutcome(id, from, to, reason) {
+      return guarded(id, from, { status: to, reason });
+    },
+    async overdueScheduled(before) {
+      return blogRows(['scheduled'])
+        .filter((r) => r.scheduled_for !== null && r.scheduled_for < before)
+        .map(clone);
+    },
+    async blogNeedsCheck() {
+      return blogRows(['needs_check', 'sending']).map(clone);
+    },
+    async lastSentAt() {
+      return sent()[0]?.sent_at ?? null;
+    },
+    async sentPostSlugs() {
+      return sent()
+        .map((r) => r.post_slug)
+        .filter((slug): slug is string => slug !== null);
+    },
+    async recentHeroImages(n) {
+      return sent()
+        .map((r) => r.hero_image_url)
+        .filter((url): url is string => url !== null)
+        .slice(0, n);
+    },
+    async nextIssueNumber() {
+      return Array.from(rows.values()).reduce((max, r) => Math.max(max, r.issue_number ?? 0), 0) + 1;
     },
   };
 
@@ -522,6 +603,7 @@ export function createMemoryIssues(now: () => Date) {
         hero_image_alt: '',
         body: { type: 'doc', content: [] },
         share_url: null,
+        ...plain,
         ...blank,
         id: nextId(),
         status: 'draft',
