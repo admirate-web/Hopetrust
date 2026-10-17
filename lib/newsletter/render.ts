@@ -242,7 +242,7 @@ function renderBlock(node: BlockNode, ctx: InlineContext): string {
     case 'image': {
       const src = allowedImageUrl(node.attrs?.src, ctx.imagePrefixes);
       if (!src) return '';
-      return `<img src="${esc(src)}" alt="${esc(node.attrs?.alt ?? '')}" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;margin:8px 0 20px 0;">`;
+      return `<img src="${esc(src)}" alt="${esc(node.attrs?.alt ?? '')}" width="${BODY_IMAGE_WIDTH}" style="display:block;width:100%;max-width:${BODY_IMAGE_WIDTH}px;height:auto;border:0;margin:8px 0 20px 0;">`;
     }
     default:
       return '';
@@ -356,7 +356,10 @@ export const UNSUBSCRIBE_PLACEHOLDER = '{{{RESEND_UNSUBSCRIBE_URL}}}';
 export const SIZE_WARN_BYTES = 80 * 1024;
 export const SIZE_MAX_BYTES = 95 * 1024;
 
-const WIDTH = 640;
+/** Email tables are 600 px wide (fortnightly spec §4); the client's design, at 640, is scaled to it. */
+const WIDTH = 600;
+/** The shell less its 40 px sides. */
+const BODY_IMAGE_WIDTH = WIDTH - 80;
 const INSTAGRAM_HREF = 'https://www.instagram.com/hopetrust/';
 const FACEBOOK_HREF = 'https://www.facebook.com/hopetrust';
 const CONTACT_EMAIL = 'frontoffice@hopetrustindia.com';

@@ -137,7 +137,7 @@ describe('renderBodyHtml', () => {
       ),
       opts,
     );
-    expect(html).toContain(`<img src="${IMAGES}/issues/river.jpg" alt="A mountain river" width="560"`);
+    expect(html).toContain(`<img src="${IMAGES}/issues/river.jpg" alt="A mountain river" width="520"`);
     expect(html).not.toContain('evil.example');
   });
 

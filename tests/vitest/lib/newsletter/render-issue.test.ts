@@ -101,7 +101,7 @@ describe('The Hope Letter: a blog issue', () => {
   it('puts the round logo in the masthead, and the post photo, with its alt text, linking to the post', () => {
     const html = render(blog());
     expect(html).toContain(`src="${IMAGES}/static/logo-round-v1.png"`);
-    expect(html).toContain(`<a href="${POST}?${UTM}" target="_blank"><img src="${esc(PHOTO)}" width="640" alt="${TITLE}"`);
+    expect(html).toContain(`<a href="${POST}?${UTM}" target="_blank"><img src="${esc(PHOTO)}" width="600" alt="${TITLE}"`);
   });
 
   it('shows the question box only when there is a question', () => {
@@ -212,9 +212,16 @@ describe('The Hope Letter: safety', () => {
     expect(render(blog({ preheader: '', intro: '' }))).toContain(`${esc(TITLE)}&#847;&zwnj;&nbsp;`);
   });
 
-  it('keeps a 640 px shell for Outlook, and reports the UTF-8 size', () => {
-    const { html, bytes } = renderIssueHtml(blog({ title: 'मन 🌿' }), options('send'));
-    expect(html).toContain('width="640" align="center" class="email-shell"');
+  it('keeps a 600 px shell for Outlook with nothing in it wider (fortnightly spec §4), and reports the UTF-8 size', () => {
+    const image = { type: 'image' as const, attrs: { src: `${IMAGES}/issues/a/river.jpg`, alt: 'A river' } };
+    const { html, bytes } = renderIssueHtml(
+      manual({ title: 'मन 🌿', share_url: POST, body: { type: 'doc', content: [image] } }),
+      options('send', { panel: PANEL }),
+    );
+    expect(html).toContain('width="600" align="center" class="email-shell"');
+    const widths = Array.from(bodyOf(html).matchAll(/\bwidth="(\d+)"|width:\s*(\d+)px/g), (m) => Number(m[1] ?? m[2]));
+    expect(widths.length).toBeGreaterThan(5);
+    expect(Math.max(...widths)).toBe(600);
     expect(bytes).toBe(new TextEncoder().encode(html).length);
   });
 });
