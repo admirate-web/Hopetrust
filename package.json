@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:netlify": "netlify dev",
-    "build": "next build && node scripts/generate-sitemap.mjs",
+    "build": "node scripts/newsletter-posts.mts && next build && node scripts/generate-sitemap.mjs",
+    "newsletter:posts": "node scripts/newsletter-posts.mts",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
