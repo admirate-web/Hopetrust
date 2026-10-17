@@ -34,6 +34,8 @@ const NOT_FOUND =
   "Resend has no record of this send, so nothing went out. It's a draft again: send it by hand from the Newsletter tab if it should still go.";
 /** A scheduled function may run for 30 seconds; the full sync gets half. */
 const AUTO_SYNC_BUDGET_MS = 15_000;
+/** An email that hasn't gone after this long has failed, so a claimed preview is given back in time for the next run. */
+const AUTO_EMAIL_TIMEOUT_MS = 8_000;
 /** A send still unfinished after this long may have been stopped by Netlify. */
 const STALE_SENDING_MS = 2 * 60_000;
 /** How long Resend gets to list a broadcast before "not found" counts. */
@@ -64,6 +66,7 @@ export async function runAutomatic(
       replyTo: deps.config.replyTo,
       subject,
       html,
+      timeoutMs: AUTO_EMAIL_TIMEOUT_MS,
     });
   /** A note to staff; a failed note is logged, never fatal. */
   const tell = async (subject: string, lines: string[]) => {

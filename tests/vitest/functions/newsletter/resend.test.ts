@@ -138,6 +138,20 @@ describe('createResendClient', () => {
     });
   });
 
+  it('sendEmail gives up after its time limit', async () => {
+    let signal: AbortSignal | null | undefined;
+    const slowFetch = (_url: string, init: RequestInit) => {
+      signal = init.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    };
+    const resend = createResendClient({ apiKey: 're_test', minIntervalMs: 0, fetch: slowFetch as unknown as typeof fetch });
+    const email = { from: 'Hope Trust <newsletter@hopetrustindia.com>', to: ['a@example.com'], subject: 'Hi', html: '<p>Hi</p>' };
+    await expect(resend.sendEmail({ ...email, timeoutMs: 20 })).rejects.toThrow();
+    expect(signal?.aborted).toBe(true);
+  }, 1000);
+
   it('turns an error reply into a ResendError with its status, type and message', async () => {
     const { resend } = client([
       { status: 422, body: { statusCode: 422, name: 'validation_error', message: 'Invalid `email` field.' } },

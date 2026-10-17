@@ -94,6 +94,15 @@ describe('the preview window', () => {
     expect(t.resend.sent).toHaveLength(1);
   });
 
+  it('gives up on a preview email that hangs, in time to give the claim back', async () => {
+    const t = await setup();
+    t.goTo(PREVIEW_AT);
+    t.resend.hangNext('sendEmail');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await t.run();
+    expect(t.blogRows()[0].preview_sent_at).toBeNull();
+  }, 1000);
+
   it('sends a skip note when a newsletter went out less than 14 days before, then previews the next one normally', async () => {
     const t = await setup();
     t.issueStore.seed({ status: 'sent', sent_at: '2026-10-12T10:00:00.000Z', issue_number: 1, subject: 'By hand' });

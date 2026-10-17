@@ -358,6 +358,7 @@ export function createFakeResend() {
   const broadcasts: FakeBroadcast[] = [];
   const lostReplies: Error[] = [];
   let ids = 0;
+  let hangingEmails = 0;
 
   const find = (key: string) =>
     contacts.get(key) ?? [...contacts.values()].find((c) => c.email === key.toLowerCase());
@@ -428,6 +429,12 @@ export function createFakeResend() {
     },
     async sendEmail(input) {
       step('sendEmail');
+      if (hangingEmails > 0) {
+        hangingEmails -= 1;
+        // Resend never answers: the real client gives up at the time limit; without one it waits for ever.
+        if (input.timeoutMs) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+        return new Promise<string>(() => {});
+      }
       sent.push(input);
       return `email-${sent.length}`;
     },
@@ -471,6 +478,10 @@ export function createFakeResend() {
     /** Makes the next call to `method` throw `error`. */
     failNext(method: keyof ResendClient, error: Error = new ResendError(500, 'application_error', 'Resend is down')) {
       failures.push({ method, error });
+    },
+    /** The next email gets no answer from Resend. */
+    hangNext(_method: 'sendEmail') {
+      hangingEmails += 1;
     },
   };
 }

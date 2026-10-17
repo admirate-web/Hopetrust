@@ -36,6 +36,8 @@ export interface EmailInput {
   html: string;
   text?: string;
   replyTo?: string;
+  /** Give up after this long, rather than wait until Netlify stops the function. */
+  timeoutMs?: number;
 }
 
 export interface BroadcastInput {
@@ -233,14 +235,20 @@ export function createResendClient(options: ResendClientOptions): ResendClient {
     },
 
     async sendEmail(input) {
-      const sent = await request('POST', '/emails', {
-        from: input.from,
-        to: input.to,
-        subject: input.subject,
-        html: input.html,
-        ...(input.text ? { text: input.text } : {}),
-        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
-      });
+      const sent = await request(
+        'POST',
+        '/emails',
+        {
+          from: input.from,
+          to: input.to,
+          subject: input.subject,
+          html: input.html,
+          ...(input.text ? { text: input.text } : {}),
+          ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+        },
+        false,
+        input.timeoutMs,
+      );
       return String(sent?.id ?? '');
     },
 
