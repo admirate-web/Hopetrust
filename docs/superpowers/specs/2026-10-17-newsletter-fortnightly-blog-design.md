@@ -2,7 +2,7 @@
 
 - **Date:** 17 October 2026
 - **Branch:** `feat-newsletter` (not merged; nothing is live yet)
-- **Status:** awaiting review
+- **Status:** approved by the user, 17 Oct 2026 (design 01, previews to essentials@admirate.in)
 - **Builds on:** `docs/superpowers/specs/2026-10-13-newsletter-design.md` (the "base spec"), built in plans 1–3. Everything there still holds unless this document says otherwise.
 - **Design reference:** `docs/design/newsletter-2026-10-17-hope-letter.html`, the client's preview page (17 Oct 2026).
   - It holds two designs, **01 Cream editorial** and **02 Teal contemporary**, each with and without an optional book panel. Its buttons switch between them.
@@ -27,7 +27,8 @@ Hope Trust wants its newsletter, The Hope Letter, to go out every fortnight with
 | Send time | Tuesday, 10:00 India time, every other week | User |
 | Question box | Shown only when someone has written a question | User |
 | Safety net | A preview email to staff 48 hours before, with a link to swap the post or skip. If nobody acts, it goes. | User |
-| Design | 01 Cream editorial or 02 Teal contemporary: **open (§11)** | Client |
+| Design | **01 Cream editorial.** Only this one is built. | Client |
+| Preview recipients | Start as `essentials@admirate.in`; changeable in the settings | User |
 | Starting | Automatic sending is off until staff switch it on and set the first send date | Claude |
 | Posts without a usable photo | Never chosen automatically | Claude |
 | Intro text | The post's first paragraph, cleaned; else its summary; else its excerpt (§5.3). Editable. No AI-written text. | Claude |
@@ -86,7 +87,7 @@ Built from the chosen design's HTML in the reference file. Copy, colours and typ
 |---|---|---|---|
 | 1 | **Masthead:** logo, "The Hope Letter", the design's "fortnightly" line, issue number ("Issue 01") | Same | Same |
 | 2 | **Kicker:** a short label above the title | Default from §5.3; editable | Optional field |
-| 3 | **Title:** if it contains `: `, the part after the first colon gets the design's emphasis (italic in 01, yellow in 02) | The post title | The title field |
+| 3 | **Title:** if it contains `: `, the part after the first colon is set in italic, as in the design's sample title | The post title | The title field |
 | 4 | **Byline:** "By Hope Trust · 9 min read" | The post's reading time | Reading time of the body |
 | 5 | **Hero photo:** full width | The post's photo (§4.1) | The uploaded photo, as now |
 | 6 | **Main text** | The intro paragraph, the question box if a question is written, then **Read the article** linking to the post | The rich-text body (base §6.3; pull-quotes take the question box's style). **Read the article** appears only when an article link is set |
@@ -141,7 +142,7 @@ Built from the chosen design's HTML in the reference file. Copy, colours and typ
 - **Settings:** a new "Automatic" panel in the Newsletter tab, with:
   - an on/off switch, off until Hope Trust switches it on;
   - the first send date;
-  - preview recipients, up to 5 addresses.
+  - preview recipients, up to 5 addresses, starting as `essentials@admirate.in`.
 - **The panel also shows** the next preview time, the next send time and the post next in line.
 
 ### 5.2 One newsletter per fortnight
@@ -168,7 +169,7 @@ When automatic sending is on and a send time is 48 hours away:
 |---|---|
 | Subject | The post title |
 | Inbox preview text | The excerpt |
-| Kicker | The post's first category, or the chosen design's sample kicker when that category is the generic "Blog" ("A moment for yourself" in 01, "A little space for you" in 02) |
+| Kicker | The post's first category, or "A moment for yourself" (the design's sample) when that category is the generic "Blog" |
 | Title | The post title |
 | Intro | The post's first prose paragraph (rules below). If none qualifies, the `summary` (22 posts have one), else the excerpt. The excerpts are written for search results ("Discover…", "Explore…"), so they come last. |
 | Byline | Reading time, as §4 part 4 |
@@ -339,8 +340,10 @@ Some post titles lost a space or a separator in the WordPress import. A post's t
 
 ## 11. Open questions for Hope Trust
 
-1. Which design: 01 Cream editorial or 02 Teal contemporary?
-2. Who gets the preview emails?
+None left. On 17 Oct 2026 the user answered both:
+
+1. **Design:** the client picked 01 Cream editorial.
+2. **Preview emails:** they go to `essentials@admirate.in`.
 
 ## 12. Left to the builder
 
