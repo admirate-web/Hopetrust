@@ -41,3 +41,6 @@ next-env.d.ts
 # playwright
 /playwright-report/
 /test-results/
+
+# newsletter previews (scripts/newsletter-preview.mts)
+/.newsletter-preview/

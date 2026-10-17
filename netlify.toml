@@ -3,7 +3,9 @@
   publish = "out"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # 24: the build starts with scripts/newsletter-posts.mts, which needs Node's
+  # built-in TypeScript (22.18+). It's also the version the functions run on.
+  NODE_VERSION = "24"
   NPM_FLAGS = "--production=false"
 
 [dev]
@@ -513,6 +515,27 @@
 [[redirects]]
   from = "/api/admin-programs"
   to = "/.netlify/functions/admin-programs"
+  status = 200
+
+# Newsletter (Netlify Functions)
+[[redirects]]
+  from = "/api/newsletter-subscribe"
+  to = "/.netlify/functions/newsletter-subscribe"
+  status = 200
+
+[[redirects]]
+  from = "/api/newsletter-confirm"
+  to = "/.netlify/functions/newsletter-confirm"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin-newsletter-subscribers"
+  to = "/.netlify/functions/admin-newsletter-subscribers"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin-newsletter-issues"
+  to = "/.netlify/functions/admin-newsletter-issues"
   status = 200
 
 # PAYMENT DISABLED — uncomment when Razorpay is integrated

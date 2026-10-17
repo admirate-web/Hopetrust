@@ -36,4 +36,9 @@ describe('Footer', () => {
     const externalLinks = links.filter((l) => l.getAttribute('target') === '_blank');
     expect(externalLinks.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('offers the newsletter sign-up', () => {
+    render(<Footer />);
+    expect(screen.getByRole('button', { name: 'Subscribe to our newsletter' })).toBeInTheDocument();
+  });
 });

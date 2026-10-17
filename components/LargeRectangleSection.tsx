@@ -9,8 +9,7 @@ import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { cn } from "@/lib/utils";
 import VariableProximity from "./VariableProximity";
 import { getAssetUrl } from '@/lib/assets';
-// NEWSLETTER DISABLED — uncomment when newsletter is enabled
-// import NewsletterForm from './NewsletterForm';
+import NewsletterForm from './NewsletterForm';
 
 const robotoFlex = Roboto_Flex({
   subsets: ["latin"],
@@ -103,10 +102,8 @@ export default function LargeRectangleSection() {
                 isHovered ? "text-[#E5F4F4]" : "text-[#00373E]",
               )}
             >
-              Connect with others, share experiences, and find encouragement in
-              a safe, supportive space.
+              A fortnightly letter from our team, with ideas you can use between sessions.
             </p>
-            {/* NEWSLETTER DISABLED — uncomment when newsletter is enabled
             <div
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
@@ -114,7 +111,6 @@ export default function LargeRectangleSection() {
             >
               <NewsletterForm variant="inline" dark={isHovered} />
             </div>
-            */}
           </div>
 
           {/* Right side left empty so background image shows */}

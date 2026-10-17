@@ -11,6 +11,24 @@
         ],
         "createdAt": "2026-10-11T19:14:10.062Z",
         "reason": "Claude triage: the only match is the pre-existing .blog-content blockquote left rule (in HEAD before this session) - standard quotation styling for article blockquotes, not a card"
+      },
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "files": [
+          "lib/newsletter/render.ts"
+        ],
+        "createdAt": "2026-10-13T17:58:18.687Z",
+        "reason": "Design team's newsletter PDF embeds Montserrat (docs/design/newsletter-template-2026-10.pdf); spec 6.1 specifies it for the email"
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "lib/newsletter/render.ts"
+        ],
+        "createdAt": "2026-10-13T17:58:19.977Z",
+        "reason": "Email-client fallback: Outlook and Gmail ignore web fonts, so spec 6.1 names Arial/Helvetica as the newsletter's fallback"
       }
     ]
   }

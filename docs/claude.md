@@ -10,7 +10,7 @@ This is a **statically exported Next.js 15 application** hosted on **Netlify**, 
 
 ## Disabled Features (as of May 2026)
 
-The following features are **temporarily disabled** and commented out in the codebase. All original code is preserved in comments (marked `PAYMENT DISABLED`, `NEWSLETTER DISABLED`, or `WHATSAPP CRM DISABLED`) and in git history for future re-enablement.
+The following features are **temporarily disabled** and commented out in the codebase. All original code is preserved in comments (marked `PAYMENT DISABLED` or `WHATSAPP CRM DISABLED`) and in git history for future re-enablement.
 
 ### Payment / Enrollment (Razorpay)
 - **Enroll buttons** on `/training` and `/addiction` pages — commented out
@@ -26,17 +26,6 @@ The following features are **temporarily disabled** and commented out in the cod
 - All lib modules (`lib/enrollment.ts`, `lib/enrollments-admin.ts`)
 - Components (`components/EnrollmentModal.tsx`, `components/admin/EnrollmentsTab.tsx`)
 - Database tables and RLS policies
-
-### Newsletter
-- **`LargeRectangleSection`** (homepage newsletter signup card) — dynamic import and `<LargeRectangleSection />` commented out in `app/page.tsx`; `NewsletterForm` usage commented out inside the component
-- **Blog newsletter CTA** — `NewsletterForm` import and CTA section commented out in `components/BlogListClient.tsx`
-- **Footer "Subscribe to our newsletter" button** — commented out in `components/Footer.tsx`
-
-**Not removed** (standalone, untouched):
-- `components/NewsletterForm.tsx`
-- `lib/newsletter-template.ts`
-- `supabase/functions/send-newsletter/`
-- `newsletter_subscribers` database table
 
 ### WhatsApp CRM
 - **`WhatsAppButton`** floating icon — component now returns `null`; import and usage commented out in `app/layout.tsx`
@@ -61,12 +50,25 @@ The following features are **temporarily disabled** and commented out in the cod
 > **Note:** `POST /api/chat` remains publicly reachable and still forwards to the CRM webhook. Nothing on the site calls it, but it is not closed. If the bubble is staying off for a while, comment out the `/api/chat` redirect in `netlify.toml` too.
 
 ### How to re-enable
-1. Search for `PAYMENT DISABLED`, `NEWSLETTER DISABLED`, `WHATSAPP CRM DISABLED`, and `CHAT BUBBLE DISABLED` across the codebase
+1. Search for `PAYMENT DISABLED`, `WHATSAPP CRM DISABLED`, and `CHAT BUBBLE DISABLED` across the codebase
 2. Uncomment the marked blocks
 3. Restore the original `public/_headers` CSP and `netlify.toml` redirects + Permissions-Policy
 4. Restore `app/enrollment-success/page.tsx` from git history
 5. For WhatsApp: set `CRM_ENDPOINT` and `WHATSAPP_CRM_TOKEN` env vars for the new CRM provider
 6. Verify build with `npx tsc --noEmit && npm run build`
+
+---
+
+## Newsletter (October 2026)
+
+Staff write and send a monthly email newsletter from the **Newsletter** tab in `/arel-ops`. The design is in `docs/superpowers/specs/2026-10-13-newsletter-design.md`, and the plans that built it are in `docs/superpowers/plans/`.
+
+- **Sign-up:** `components/NewsletterForm.tsx` sits in the footer dialog, on the blog listing and in the homepage card. People confirm by email, through `/newsletter/confirm/`.
+- **Functions:** these are TypeScript `.mts` files in `netlify/functions/`: `newsletter-subscribe`, `newsletter-confirm`, `admin-newsletter-subscribers`, `admin-newsletter-issues`, and the hourly `newsletter-cleanup`. The shared code is in `netlify/functions/_shared/newsletter-*.mts`. Its services come in through `newsletter-deps.mts`, so the tests use in-memory versions (`tests/vitest/functions/newsletter/fakes.ts`).
+- **The email:** `lib/newsletter/render.ts` builds the HTML for the editor's preview, the test send and the broadcast. `node --env-file=.env scripts/newsletter-preview.mts` renders the sample issue, and `--send you@example.com` emails it as a test.
+- **Data:** `Database/newsletter.sql` holds subscribers, erased addresses, sign-up requests and issues; `Database/newsletter-storage.sql` holds the `newsletter-images` bucket. Apply SQL changes in the Supabase SQL editor.
+- **Resend:** it needs a Full access key (`RESEND_API_KEY`), the "Newsletter" segment (`RESEND_NEWSLETTER_SEGMENT_ID`) and `NEWSLETTER_FROM_EMAIL`. Supabase is the record of consent. Resend holds a copy of the subscribed contacts, sends the broadcasts and hosts the unsubscribe page.
+- **Admin sign-in:** `node --env-file=.env scripts/seed-admin.mjs <email> <password>` creates an admin, or resets an admin's password.
 
 ---
 
@@ -79,7 +81,7 @@ The following features are **temporarily disabled** and commented out in the cod
 | **Styling**      | TailwindCSS 3.3 + shadcn/ui (47 Radix-based UI primitives) + tailwindcss-animate |
 | **Animation**    | Framer Motion (via `motion` package v11), Lenis smooth scroll, Three.js / OGL for 3D effects |
 | **Database**     | Supabase (PostgreSQL) — anonymous client via `@supabase/supabase-js` v2   |
-| **Email**        | Resend API v6 (for bulk newsletter sending)                                |
+| **Email**        | Resend REST API (newsletter broadcasts, confirmation, enrollment and test emails) |
 | **Validation**   | Zod v3 + react-hook-form v7                                               |
 | **Blog/CMS**     | ~395 MDX files in `content/blogs/` (migrated from WordPress), parsed with `gray-matter` + `marked` |
 | **Hosting**      | Netlify (static export + Netlify Functions + Netlify Forms)                |
@@ -123,6 +125,7 @@ Hopetrust/
 │   ├── BlogListClient.tsx      # Blog listing with filtering/pagination (~16KB)
 │   ├── TherapistCard.tsx       # Doctor/therapist card component
 │   ├── NewsletterForm.tsx      # Newsletter signup (inline + card variants)
+│   ├── admin/newsletter/       # Newsletter tab: issues, editor, preview, subscribers
 │   ├── WhatsAppButton.tsx      # Floating WhatsApp button (disabled — returns null)
 │   ├── ContactSection.tsx      # Homepage contact section
 │   ├── FadeInSection.tsx       # Scroll-triggered fade-in wrapper
@@ -150,7 +153,7 @@ Hopetrust/
 │   ├── jsonld.ts               # JSON-LD structured data schema generators (Organization, Service, Breadcrumb, FAQ)
 │   ├── enrollment.ts           # Razorpay client API + checkout loader (sends Idempotency-Key)
 │   ├── enrollments-admin.ts    # Admin enrollments API wrapper
-│   ├── newsletter-template.ts  # HTML email template builder
+│   ├── newsletter/             # Newsletter: issue rules, renderer, sign-up rules, import
 │   ├── utils.ts                # cn() — Tailwind class merger
 │   ├── assets.test.ts          # Asset utility tests
 │   └── utils.test.ts           # Utils tests
@@ -184,16 +187,10 @@ Hopetrust/
 │       ├── enrollment-status.mjs  # Netlify Function: enrollment polling (UUID-gated)
 │       └── whatsapp-crm.mjs    # Netlify Function: WhatsApp CRM proxy (disabled — 503 stub)
 │
-├── supabase/
-│   └── functions/
-│       └── send-newsletter/
-│           └── index.ts        # Supabase Edge Function: bulk newsletter email
-│
 ├── scripts/
 │   ├── generate-sitemap.mjs    # Post-build sitemap.xml + robots.txt
 │   ├── seed-admin.mjs          # CLI: create/update admin user with bcrypt hash
-│   ├── migrate-wp.mjs          # WordPress → MDX migration tool
-│   └── test-newsletter.mjs     # Newsletter send test script
+│   └── migrate-wp.mjs          # WordPress → MDX migration tool
 │
 ├── public/                     # Static public assets
 ├── netlify.toml                # Netlify config (build, redirects, headers, caching)
@@ -454,24 +451,7 @@ Immutable append-only log of all admin actions. Written server-side only by `adm
   3. Returns CRM response to client
 - **Error Handling:** Returns 405 for non-POST, 500 if CRM not configured, 502 if CRM request fails
 
-### 2. Supabase Edge Function: `send-newsletter`
-
-- **File:** `supabase/functions/send-newsletter/index.ts`
-- **Runtime:** Deno (Supabase Edge Functions)
-- **Purpose:** Send branded HTML newsletter emails to all active subscribers
-- **Auth:** Requires `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` header — unauthenticated requests return 401
-- **XSS Prevention:** All user-supplied content (`customMessage`, post titles, excerpts, URLs, image URLs) is HTML-escaped via `esc()` helper before interpolation into the email template
-- **Email Provider:** Resend API
-- **Flow:**
-  1. Validates Bearer token against `SUPABASE_SERVICE_ROLE_KEY`
-  2. Receives JSON body with `customMessage` and optional `recentPosts[]`
-  3. Queries `newsletter_subscribers` where `is_active = true`
-  4. Builds branded HTML email with escaped content (Hope Trust header, custom message, blog post cards, CTA, footer)
-  5. Sends emails in **batches of 50** with **1-second delay** between batches
-  6. Returns `{ sent, failed, errors }` summary
-- **Required Env:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`
-
-### 4. Client-Side Supabase Calls (No Server API)
+### 5. Client-Side Supabase Calls (No Server API)
 
 Forms submit **directly from the browser** to Supabase using the anon key:
 
@@ -479,7 +459,8 @@ Forms submit **directly from the browser** to Supabase using the anon key:
 | --------------- | ------------------------ | ----------------------------------- |
 | Contact form    | `contact_submissions`    | Also POSTs to Netlify Forms backup  |
 | Join Us form    | `joinus_applications`    | Uploads CV to `cv-uploads` bucket first |
-| Newsletter form | `newsletter_subscribers` | Handles duplicate email (code 23505) |
+
+The newsletter form doesn't write to Supabase directly: it posts to the `newsletter-subscribe` function (see "Newsletter (October 2026)").
 
 ---
 
@@ -598,14 +579,6 @@ JSON-LD structured data generators for SEO:
 - **`updateTrainingProgram(token, data)`** — Updates program by ID (admin auth required)
 - **`deleteTrainingProgram(token, id)`** — Deletes program by ID (admin auth required)
 
-### `lib/newsletter-template.ts`
-Builds a complete branded HTML email template with:
-- Hope Trust branded header (dark teal + orange accent)
-- Custom message body
-- Blog post cards with featured images
-- "Need Support?" CTA section
-- Footer with contact info + unsubscribe link
-
 ---
 
 ## Custom Hooks
@@ -631,7 +604,8 @@ IntersectionObserver-based hook that returns `{ elementRef, isVisible }`. Featur
 | `CRM_ENDPOINT`                      | Server     | Netlify whatsapp-crm function *(disabled)* |
 | `WHATSAPP_CRM_TOKEN`               | Server     | Netlify whatsapp-crm auth *(disabled)*     |
 | `ADMIN_JWT_SECRET`                  | Server     | Sign/verify admin JWTs (admin-login + admin-programs) |
-| `RESEND_API_KEY`                    | Server     | Supabase newsletter edge function          |
+| `RESEND_API_KEY`                    | Server     | Newsletter functions + enrollment emails (Full access key) |
+| `RESEND_NEWSLETTER_SEGMENT_ID`      | Server     | Newsletter functions (Resend "Newsletter" segment) |
 | `NEWSLETTER_FROM_EMAIL`            | Server     | Newsletter "from" address                  |
 | `SUPABASE_SERVICE_ROLE_KEY`        | Server     | admin-login, admin-programs, newsletter fn |
 
@@ -695,7 +669,7 @@ npm run build    # next build && node scripts/generate-sitemap.mjs
 │                   ├──► Supabase (joinus_applications INSERT) │
 │                   └──► Netlify Forms (backup)                │
 │                                                              │
-│  Newsletter ──────────► Supabase (newsletter_subscribers)    │  *(currently disabled)*
+│  Newsletter ──────────► Netlify Function ──► Supabase/Resend │
 │                                                              │
 │  Doctor List ─────────► Supabase (doctors SELECT active)     │
 │                                                              │
@@ -709,10 +683,10 @@ npm run build    # next build && node scripts/generate-sitemap.mjs
 │                    ADMIN / BACKEND                            │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Newsletter Send ─────► Supabase Edge Function               │
-│                         ├── Read subscribers (service_role)   │
-│                         ├── Build HTML template               │
-│                         └── Send via Resend API (batch 50)    │
+│  Newsletter Send ─────► Netlify Function (issues API)        │
+│                         ├── Push pending changes to Resend   │
+│                         ├── Render the issue's email HTML    │
+│                         └── Create one Resend broadcast      │
 │                                                              │
 │  Doctor Management ───► Supabase Dashboard (service_role)    │
 │  Form Submissions ────► Supabase Dashboard / Netlify Forms   │

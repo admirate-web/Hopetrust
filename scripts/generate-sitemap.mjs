@@ -243,7 +243,7 @@ function verifyStaticPages(pages) {
 
   // Built routes that are deliberately not in the sitemap.
   const UNLISTED = new Set([
-    '_next', 'blogs', 'therapists', 'blog-images', 'arel-ops', 'enrollment-success', '404',
+    '_next', 'blogs', 'therapists', 'blog-images', 'arel-ops', 'enrollment-success', '404', 'newsletter',
   ]);
   const listed = new Set(pages.map((p) => p.path.replace(/^\/|\/$/g, '')));
   const unlisted = fs
