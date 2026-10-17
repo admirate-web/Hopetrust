@@ -6,7 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 import { newsletterImagesBase } from '../../../lib/newsletter/render';
 import { verifyAdminToken, type AdminUser } from './admin.mts';
 import { createNewsletterDb, type NewsletterDb } from './newsletter-db.mts';
-import { createImageStorage, createIssuesDb, type ImageStorage, type IssuesDb } from './newsletter-issues-db.mts';
+import {
+  createImageStorage,
+  createIssuesDb,
+  createSettingsStore,
+  type ImageStorage,
+  type IssuesDb,
+  type SettingsStore,
+} from './newsletter-issues-db.mts';
+import type { NewsletterPost } from '../../../lib/newsletter/posts';
+// Written by scripts/newsletter-posts.mts at the start of every build; esbuild bundles it.
+import POSTS from '../../../lib/newsletter/posts.generated.json';
 import { createResendClient, type ResendClient } from './resend.mts';
 
 /** The main site. Netlify sets URL for functions at runtime. */
@@ -31,6 +41,10 @@ export interface NewsletterDeps {
   issues: IssuesDb;
   /** Signed upload URLs for the photos in an issue. */
   images: ImageStorage;
+  /** The Hope Letter's settings (fortnightly spec §5.1). */
+  settings: SettingsStore;
+  /** Every blog post, newest first, as the newsletter needs it (fortnightly spec §5.7). */
+  posts: () => NewsletterPost[];
   resend: ResendClient;
   config: NewsletterConfig;
   now: () => Date;
@@ -61,6 +75,8 @@ export function liveDeps(env: Record<string, string | undefined> = process.env):
     db: createNewsletterDb(supabase),
     issues: createIssuesDb(supabase),
     images: createImageStorage(supabase, imagesBase),
+    settings: createSettingsStore(supabase),
+    posts: () => POSTS as NewsletterPost[],
     resend: createResendClient({ apiKey: env.RESEND_API_KEY as string }),
     config: {
       segmentId: env.RESEND_NEWSLETTER_SEGMENT_ID as string,

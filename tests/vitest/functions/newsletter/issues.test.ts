@@ -4,7 +4,7 @@ import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps
 import { handleAdminIssues } from '@/netlify/functions/_shared/newsletter-issues.mts';
 import { ResendError } from '@/netlify/functions/_shared/resend.mts';
 import type { BodyDoc } from '@/lib/newsletter/content';
-import { ADMIN_EMAIL, ADMIN_TOKEN, IMAGES_BASE, SEGMENT, jsonRequest, makeDeps } from './fakes';
+import { ADMIN_EMAIL, ADMIN_TOKEN, IMAGES_BASE, POSTS, SEGMENT, jsonRequest, makeDeps } from './fakes';
 
 const BASE = 'https://hopetrustindia.com/api/admin-newsletter-issues';
 const AUTH = { authorization: `Bearer ${ADMIN_TOKEN}` };
@@ -192,7 +192,8 @@ describe('test send', () => {
       replyTo: 'frontoffice@hopetrustindia.com',
       subject: '[TEST] Know thyself',
     });
-    expect(email.html).toContain('Know Thyself: The Start of Every Relationship');
+    expect(email.html).toContain('Know Thyself:<br><em style="font-weight:normal;">The Start of Every Relationship</em>');
+    expect(email.html).toContain('ISSUE 01');
     expect(email.html).not.toContain('{{{RESEND_UNSUBSCRIBE_URL}}}');
     expect(t.memory.audits).toContainEqual(
       expect.objectContaining({ action: 'NEWSLETTER_TEST_SEND', resourceId: issue.id, metadata: { recipients: 2 } }),
@@ -410,5 +411,205 @@ describe('check status', () => {
     const t = makeDeps();
     const issue = t.issueStore.seed(READY);
     expect((await call(t.deps, 'POST', `?id=${issue.id}&action=check`)).status).toBe(409);
+  });
+});
+
+/** A blog issue the automatic run scheduled for Tue 20 Oct (the fake clock is Wed 14 Oct, 10:00 UTC). */
+const SCHEDULED = {
+  ...READY,
+  kind: 'blog' as const,
+  status: 'scheduled' as const,
+  scheduled_for: '2026-10-20T04:30:00.000Z',
+  post_slug: POSTS[1].slug,
+  share_url: POSTS[1].url,
+  intro: POSTS[1].intro,
+  question: 'What would change?',
+};
+
+describe('the 14-day gap and issue numbers', () => {
+  it('refuses a manual send within 14 days of the last newsletter, naming the next date', async () => {
+    const t = ready();
+    t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-10-04T10:00:00.000Z', issue_number: 1 });
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('The next newsletter can go out on Sun 18 Oct.');
+    expect(t.resend.broadcasts).toHaveLength(0);
+    expect(t.issueStore.get(t.issue.id)?.status).toBe('draft');
+  });
+
+  it('numbers a send one after the highest number given', async () => {
+    const t = ready();
+    t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-09-01T10:00:00.000Z', issue_number: 4 });
+    const res = await call(t.deps, 'POST', `?id=${t.issue.id}&action=send`);
+    expect(res.body.issue).toMatchObject({ status: 'sent', issue_number: 5 });
+  });
+
+  it('tells the editor the next number, the last send, the next allowed date, the book panel and the next automatic send', async () => {
+    const t = makeDeps();
+    expect((await call(t.deps, 'GET')).body).toMatchObject({
+      next_issue_number: 1,
+      last_sent_at: null,
+      next_allowed_date: null,
+      panel: null,
+      next_send_at: null,
+    });
+    t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-10-04T10:00:00.000Z', issue_number: 1 });
+    await t.deps.settings.save({ ...(await t.deps.settings.get()), auto_enabled: true, first_send_date: '2026-10-20' }, 'a@x');
+    expect((await call(t.deps, 'GET')).body).toMatchObject({
+      next_issue_number: 2,
+      last_sent_at: '2026-10-04T10:00:00.000Z',
+      next_allowed_date: '2026-10-18',
+      next_send_at: '2026-10-20T04:30:00.000Z',
+    });
+  });
+});
+
+describe('settings', () => {
+  it('starts off, with the previews going to essentials@admirate.in', async () => {
+    const res = await call(makeDeps().deps, 'GET', '?action=settings');
+    expect(res.status).toBe(200);
+    expect(res.body.settings).toMatchObject({
+      auto_enabled: false,
+      first_send_date: null,
+      preview_recipients: ['essentials@admirate.in'],
+    });
+    expect(res.body.next).toBeNull();
+  });
+
+  it.each([
+    [{ first_send_date: '2026-10-21' }, 'The first send date must be a Tuesday.'],
+    [{ preview_recipients: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com', 'f@x.com'] }, 'Up to 5 addresses get the preview.'],
+    [{ preview_recipients: ['not an address'] }, '"not an address" isn\'t a valid email address.'],
+    [{ auto_enabled: true, first_send_date: null }, 'Choose the first send date before switching automatic sending on.'],
+    [{ panel_enabled: true, panel_title: '' }, 'Fill in the book panel, or switch it off.'],
+  ])('refuses %o', async (change, message) => {
+    const t = makeDeps();
+    const res = await call(t.deps, 'PUT', '?action=settings', { ...(await t.deps.settings.get()), ...change });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(message);
+  });
+
+  it('saves a Tuesday, shows the next preview, send and post, and records it', async () => {
+    const t = makeDeps();
+    const res = await call(t.deps, 'PUT', '?action=settings', {
+      ...(await t.deps.settings.get()),
+      auto_enabled: true,
+      first_send_date: '2026-10-20',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.settings).toMatchObject({ auto_enabled: true, first_send_date: '2026-10-20' });
+    expect(res.body.next).toEqual({
+      preview_at: '2026-10-18T04:30:00.000Z',
+      send_at: '2026-10-20T04:30:00.000Z',
+      post: { slug: POSTS[1].slug, title: POSTS[1].title },
+      blocked: null,
+    });
+    expect(t.settings.saves[0].actor).toBe(ADMIN_EMAIL);
+    expect(t.memory.audits).toContainEqual(expect.objectContaining({ action: 'NEWSLETTER_SETTINGS' }));
+  });
+
+  it('says when the next send falls inside the 14-day gap', async () => {
+    const t = makeDeps();
+    t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-10-12T10:00:00.000Z', issue_number: 1 });
+    const res = await call(t.deps, 'PUT', '?action=settings', {
+      ...(await t.deps.settings.get()),
+      auto_enabled: true,
+      first_send_date: '2026-10-20',
+    });
+    expect(res.body.next.blocked).toBe('A newsletter went out on Mon 12 Oct, less than 14 days before.');
+  });
+});
+
+describe('posts', () => {
+  it('lists the posts newest first, marking sent ones and those without a photo', async () => {
+    const t = makeDeps();
+    t.issueStore.seed({ ...READY, status: 'sent', sent_at: '2026-10-04T10:00:00.000Z', post_slug: POSTS[1].slug });
+    const res = await call(t.deps, 'GET', '?action=posts');
+    expect(res.body.posts).toEqual([
+      { slug: POSTS[0].slug, title: POSTS[0].title, date: POSTS[0].date, has_image: false, sent: false },
+      { slug: POSTS[1].slug, title: POSTS[1].title, date: POSTS[1].date, has_image: true, sent: true },
+      { slug: POSTS[2].slug, title: POSTS[2].title, date: POSTS[2].date, has_image: true, sent: false },
+    ]);
+  });
+});
+
+describe('a scheduled blog issue', () => {
+  it('swaps its post, refilling every field from the new one, and records it', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(SCHEDULED);
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=swap`, { slug: POSTS[2].slug });
+    expect(res.status).toBe(200);
+    expect(res.body.issue).toMatchObject({
+      status: 'scheduled',
+      post_slug: POSTS[2].slug,
+      subject: POSTS[2].title,
+      title: POSTS[2].title,
+      preheader: POSTS[2].excerpt,
+      kicker: 'Addiction',
+      intro: POSTS[2].intro,
+      question: '',
+      hero_image_url: POSTS[2].image,
+      hero_image_alt: POSTS[2].title,
+      share_url: POSTS[2].url,
+      reading_minutes: 6,
+      issue_date: '2026-10-20',
+    });
+    expect(t.memory.audits).toContainEqual(
+      expect.objectContaining({ action: 'NEWSLETTER_ISSUE_SWAP', metadata: { from: POSTS[1].slug, to: POSTS[2].slug } }),
+    );
+  });
+
+  it("won't swap a draft, or to a post that isn't in the list", async () => {
+    const t = makeDeps();
+    const draft = t.issueStore.seed(READY);
+    expect((await call(t.deps, 'POST', `?id=${draft.id}&action=swap`, { slug: POSTS[2].slug })).status).toBe(409);
+    const issue = t.issueStore.seed({ ...SCHEDULED, scheduled_for: '2026-11-03T04:30:00.000Z' });
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=swap`, { slug: 'no-such-post' });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("That post isn't in the list.");
+  });
+
+  it('skips this fortnight, and records who did', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(SCHEDULED);
+    const res = await call(t.deps, 'POST', `?id=${issue.id}&action=skip`);
+    expect(res.body.issue).toMatchObject({ status: 'skipped', reason: `Skipped in /arel-ops by ${ADMIN_EMAIL}.` });
+    expect(t.memory.audits).toContainEqual(expect.objectContaining({ action: 'NEWSLETTER_ISSUE_SKIP', resourceId: issue.id }));
+    const draft = t.issueStore.seed(READY);
+    expect((await call(t.deps, 'POST', `?id=${draft.id}&action=skip`)).status).toBe(409);
+  });
+
+  it('saves edits before its send time, not after', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(SCHEDULED);
+    const ok = await call(t.deps, 'PATCH', `?id=${issue.id}`, {
+      ...READY,
+      question: 'A new question?',
+      updated_at: issue.updated_at,
+    });
+    expect(ok.body.issue).toMatchObject({ status: 'scheduled', question: 'A new question?', post_slug: POSTS[1].slug });
+    const late = t.issueStore.seed({ ...SCHEDULED, scheduled_for: '2026-10-14T09:00:00.000Z' });
+    const res = await call(t.deps, 'PATCH', `?id=${late.id}`, { ...READY, updated_at: late.updated_at });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Its send time has passed.');
+  });
+});
+
+describe('a manual issue that links to a blog post', () => {
+  it('records the post, so the automatic newsletter never sends it again', async () => {
+    const t = makeDeps();
+    const issue = t.issueStore.seed(READY);
+    const saved = await call(t.deps, 'PATCH', `?id=${issue.id}`, {
+      ...READY,
+      share_url: POSTS[2].url,
+      updated_at: issue.updated_at,
+    });
+    expect(saved.body.issue.post_slug).toBe(POSTS[2].slug);
+    const other = await call(t.deps, 'PATCH', `?id=${issue.id}`, {
+      ...READY,
+      share_url: 'https://hopetrustindia.com/blogs/no-such-post/',
+      updated_at: saved.body.issue.updated_at,
+    });
+    expect(other.body.issue.post_slug).toBeNull();
   });
 });

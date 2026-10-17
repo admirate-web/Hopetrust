@@ -9,22 +9,34 @@ import { renderIssueHtml } from '../../../lib/newsletter/render';
 import {
   EMPTY_BODY,
   ISSUE_LIMITS,
+  blogIssueFields,
   broadcastMarker,
-  broadcastName,
   issueDraftSchema,
   issueRenderOptions,
-  sendProblems,
+  postSlugFromLink,
   todayInIndia,
-  type IssueRow,
 } from '../../../lib/newsletter/issue';
+import { RECENT_PHOTO_ISSUES, chooseNextPost } from '../../../lib/newsletter/posts';
+import {
+  NO_POST_LEFT,
+  PREVIEW_LEAD_MS,
+  formatSlot,
+  gapAllows,
+  gapReason,
+  nextAllowedDate,
+  nextSlot,
+  sendTimeOn,
+} from '../../../lib/newsletter/schedule';
+import { bookPanel, settingsSchema, type NewsletterSettings } from '../../../lib/newsletter/settings';
 import { emailSchema } from '../../../lib/newsletter/subscriber';
 import type { AdminUser } from './admin.mts';
 import { clientIp, jsonResponse, preflight, readJsonBody } from './http.mts';
 import type { NewsletterDeps } from './newsletter-deps.mts';
-import { runSync } from './newsletter-sync.mts';
-import { ResendError, type BroadcastSummary } from './resend.mts';
+import type { IssueSaveFields } from './newsletter-issues-db.mts';
+import { findBroadcast, sendLocked } from './newsletter-send.mts';
+import type { BroadcastSummary } from './resend.mts';
 
-const METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
+const METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const MAX_BODY_BYTES = 512 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const SENT_IS_READ_ONLY = 'This issue has been sent, so it can no longer be changed.';
@@ -32,7 +44,7 @@ export const SENT_IS_READ_ONLY = 'This issue has been sent, so it can no longer 
 export const STALE_SENDING_MS = 2 * 60_000;
 /** The send's own push to Resend. The Send dialog syncs first, so this only catches late changes. */
 const SEND_SYNC_BUDGET_MS = 4000;
-const MAX_BROADCAST_PAGES = 20;
+const SEND_TIME_PASSED = 'Its send time has passed.';
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 interface Ctx {
@@ -51,7 +63,10 @@ const testSchema = z.object({
     .min(1, 'Add at least one address.')
     .max(ISSUE_LIMITS.testRecipients, `Send a test to at most ${ISSUE_LIMITS.testRecipients} addresses.`),
 });
+const swapSchema = z.object({ slug: z.string().min(1).max(200) });
 const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
+const sendTimePassed = (deps: NewsletterDeps, scheduledFor: string | null) =>
+  scheduledFor !== null && deps.now().getTime() >= Date.parse(scheduledFor);
 
 export async function handleAdminIssues(req: Request, deps: NewsletterDeps | null): Promise<Response> {
   const reply = (body: unknown, status = 200) => jsonResponse(body, status, METHODS);
@@ -66,6 +81,11 @@ export async function handleAdminIssues(req: Request, deps: NewsletterDeps | nul
   if (id && !UUID.test(id)) return reply({ error: 'A valid id is required' }, 400);
   const ctx: Ctx = { req, deps, admin, id, reply };
   try {
+    if (req.method === 'GET' && action === 'settings') return await getSettings(ctx);
+    if (req.method === 'PUT' && action === 'settings') return await putSettings(ctx);
+    if (req.method === 'GET' && action === 'posts') return await listPosts(ctx);
+    if (req.method === 'POST' && id && action === 'swap') return await swap(ctx);
+    if (req.method === 'POST' && id && action === 'skip') return await skip(ctx);
     if (req.method === 'GET') return id ? await getOne(ctx) : await list(ctx);
     if (req.method === 'POST' && !id && !action) return await create(ctx);
     if (req.method === 'PATCH' && id) return await save(ctx);
@@ -81,10 +101,29 @@ export async function handleAdminIssues(req: Request, deps: NewsletterDeps | nul
   }
 }
 
-/** Who is signed in, the sender, and how many people a send would reach: the editor shows all three. */
+/**
+ * What the editor shows around an issue: who is signed in, the sender, how many
+ * people a send would reach, the next issue number, when the last newsletter
+ * went out and the next may, the book panel, and the next automatic send.
+ */
 async function context({ deps, admin }: Ctx) {
-  const counts = await deps.db.counts();
-  return { me: admin.email, from: deps.config.fromEmail, subscribed: counts.subscribed };
+  const [counts, nextNumber, lastSentAt, settings] = await Promise.all([
+    deps.db.counts(),
+    deps.issues.nextIssueNumber(),
+    deps.issues.lastSentAt(),
+    deps.settings.get(),
+  ]);
+  const automatic = settings.auto_enabled && settings.first_send_date;
+  return {
+    me: admin.email,
+    from: deps.config.fromEmail,
+    subscribed: counts.subscribed,
+    next_issue_number: nextNumber,
+    last_sent_at: lastSentAt,
+    next_allowed_date: nextAllowedDate(lastSentAt),
+    panel: bookPanel(settings),
+    next_send_at: automatic ? nextSlot(settings.first_send_date as string, deps.now()).toISOString() : null,
+  };
 }
 
 async function list(ctx: Ctx): Promise<Response> {
@@ -126,12 +165,28 @@ async function save({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
   if (jsonBytes(fields.body) > ISSUE_LIMITS.bodyJsonBytes) {
     return reply({ error: 'The body is too long to save. Split it across two issues.' }, 413);
   }
-  const saved = await deps.issues.saveDraft(id, fields, admin.email, version);
+  const before = await deps.issues.get(id);
+  if (!before) return reply({ error: 'Issue not found' }, 404);
+  if (before.status === 'scheduled' && sendTimePassed(deps, before.scheduled_for)) {
+    return reply({ error: SEND_TIME_PASSED, issue: before }, 409);
+  }
+  // A blog issue keeps its post's link; a manual one records the post its article link points at,
+  // so the automatic newsletter never sends that post again (fortnightly spec §6).
+  let toSave: IssueSaveFields;
+  if (before.kind === 'blog') {
+    toSave = { ...fields, share_url: before.share_url };
+  } else {
+    const linked = postSlugFromLink(fields.share_url);
+    toSave = { ...fields, post_slug: linked && deps.posts().some((p) => p.slug === linked) ? linked : null };
+  }
+  const saved = await deps.issues.saveDraft(id, toSave, admin.email, version);
   if (saved) return reply({ issue: saved });
 
   const current = await deps.issues.get(id);
   if (!current) return reply({ error: 'Issue not found' }, 404);
-  if (current.status !== 'draft') return reply({ error: SENT_IS_READ_ONLY, issue: current }, 409);
+  if (current.status !== 'draft' && current.status !== 'scheduled') {
+    return reply({ error: SENT_IS_READ_ONLY, issue: current }, 409);
+  }
   return reply(
     {
       error: 'Someone saved this issue after you opened it. Reload to see their changes, then make yours again.',
@@ -186,7 +241,11 @@ async function testSend({ req, deps, admin, id, reply }: Ctx): Promise<Response>
   const issue = await deps.issues.get(id);
   if (!issue) return reply({ error: 'Issue not found' }, 404);
 
-  const { html } = renderIssueHtml(issue, issueRenderOptions(deps.config.imagesBase, 'test'));
+  const [settings, nextNumber] = await Promise.all([deps.settings.get(), deps.issues.nextIssueNumber()]);
+  const { html } = renderIssueHtml(
+    issue,
+    issueRenderOptions(deps.config.imagesBase, 'test', { panel: bookPanel(settings), nextIssueNumber: nextNumber }),
+  );
   try {
     await deps.resend.sendEmail({
       from: deps.config.fromEmail,
@@ -211,12 +270,16 @@ async function testSend({ req, deps, admin, id, reply }: Ctx): Promise<Response>
 }
 
 /**
- * Sends the issue to every subscriber (spec §9.1). The guarded lock lets one
- * send through. After it, every way out either finishes the issue or puts it
- * back to draft. The exception is an unclear answer from Resend: that waits
- * for Check status, so an issue can never go out twice.
+ * Sends the issue to every subscriber (spec §9.1), unless a newsletter went out
+ * less than 14 days ago. The guarded lock lets one send through; sendLocked does the rest.
  */
 async function send({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
+  // Never two newsletters less than 14 India days apart (fortnightly spec §5.2).
+  const lastSentAt = await deps.issues.lastSentAt();
+  if (!gapAllows(lastSentAt, deps.now())) {
+    const next = formatSlot(sendTimeOn(nextAllowedDate(lastSentAt) as string));
+    return reply({ error: `The next newsletter can go out on ${next}.`, issue: await deps.issues.get(id) }, 409);
+  }
   const locked = await deps.issues.lockForSend(id, admin.email, await deps.issues.nextIssueNumber(), 'draft');
   if (!locked) {
     const current = await deps.issues.get(id);
@@ -224,86 +287,27 @@ async function send({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
     const error = current.status === 'sent' ? 'This issue has already been sent.' : 'This issue is already being sent.';
     return reply({ error, issue: current }, 409);
   }
-  const giveBack = async (status: number, error: string, extra: Record<string, unknown> = {}) => {
-    const issue = await deps.issues.backToDraft(id, error);
-    return reply({ error, ...extra, issue }, status);
-  };
 
-  const options = issueRenderOptions(deps.config.imagesBase, 'send');
-  let html = '';
-  let subscribed = 0;
-  try {
-    // Step 3: our unsubscribes and deletes must reach Resend before it sends.
-    const sync = await runSync(deps, { pull: false, deadline: deps.now().getTime() + SEND_SYNC_BUDGET_MS });
-    if (sync.remaining > 0) {
-      const said = sync.errors.length > 0 ? ` Resend said: ${sync.errors.join('; ')}.` : '';
-      const changes = sync.remaining === 1 ? "1 subscriber change hasn't" : `${sync.remaining} subscriber changes haven't`;
-      return await giveBack(
-        409,
-        `${changes} reached Resend yet, so nothing was sent.${said} Try again in a minute. If it keeps happening, unsubscribe or delete those people on the Subscribers screen.`,
-      );
-    }
-    // Step 4, with the blocks of §8.1.
-    subscribed = (await deps.db.counts()).subscribed;
-    const rendered = renderIssueHtml(locked, options);
-    html = rendered.html;
-    const problems = sendProblems({ issue: locked, html, bytes: rendered.bytes, subscribed, imagePrefixes: options.imagePrefixes });
-    if (problems.length > 0) return await giveBack(400, problems.join(' '), { problems });
-  } catch (err) {
-    console.error('[admin-newsletter-issues] before sending', err);
-    return giveBack(502, `Nothing was sent: ${errorText(err)}. Try again in a minute.`);
+  const out = await sendLocked(deps, locked, admin.email, {
+    syncPull: false,
+    syncBudgetMs: SEND_SYNC_BUDGET_MS,
+    retryTo: 'draft',
+  });
+  if (out.kind === 'retry') return reply({ error: out.error, issue: out.issue }, 409);
+  if (out.kind === 'blocked') {
+    return reply({ error: out.error, ...(out.problems ? { problems: out.problems } : {}), issue: out.issue }, out.status);
   }
+  if (out.kind === 'unclear') return reply({ error: out.error, issue: out.issue }, 502);
 
-  // Step 5.
-  let broadcastId: string;
-  try {
-    broadcastId = await deps.resend.sendBroadcast({
-      segmentId: deps.config.segmentId,
-      from: deps.config.fromEmail,
-      replyTo: deps.config.replyTo,
-      subject: locked.subject.trim(),
-      html,
-      name: broadcastName(locked),
-    });
-  } catch (err) {
-    console.error('[admin-newsletter-issues] send', err);
-    if (err instanceof ResendError && err.status >= 400 && err.status < 500) {
-      // Step 7: Resend said no, so nothing went out.
-      return giveBack(502, `Resend refused the newsletter, so nothing was sent: ${err.message}`);
-    }
-    // Step 8: it may or may not have gone out.
-    const error =
-      "We couldn't confirm whether Resend sent this issue. Wait a minute, then press Check status. Don't send it again before that.";
-    const issue = await deps.issues.markNeedsCheck(id, error);
-    return reply({ error, issue }, 502);
-  }
-
-  // Step 6. It went out, so from here nothing may put it back to draft.
-  let issue: IssueRow | null = null;
-  try {
-    issue = await deps.issues.markSent(id, {
-      resend_broadcast_id: broadcastId,
-      recipient_count: subscribed,
-      sent_at: deps.now().toISOString(),
-    });
-  } catch (err) {
-    console.error('[admin-newsletter-issues] recording a sent issue', err);
-  }
   await deps.db.audit({
     action: 'NEWSLETTER_SEND',
     actorEmail: admin.email,
     resourceType: 'newsletter_issue',
     resourceId: id,
-    metadata: { broadcast_id: broadcastId, recipients: subscribed },
+    metadata: { broadcast_id: out.broadcastId, recipients: out.recipients },
     ip: clientIp(req),
   });
-  if (!issue) {
-    return reply({
-      issue: locked,
-      warning: "It was sent, but we couldn't record that here. Press Check status in a few minutes to update this page.",
-    });
-  }
-  return reply({ issue });
+  return reply(out.warning ? { issue: out.issue, warning: out.warning } : { issue: out.issue });
 }
 
 /** Settles a send whose outcome was unclear (spec §9.1 step 8). */
@@ -351,15 +355,120 @@ async function checkStatus({ req, deps, admin, id, reply }: Ctx): Promise<Respon
   return reply({ issue: sent ?? issue, found: true });
 }
 
-/** The newest broadcast whose name holds `marker`, among those Resend went on to send. */
-async function findBroadcast(deps: NewsletterDeps, marker: string): Promise<BroadcastSummary | null> {
-  let after: string | undefined;
-  for (let page = 0; page < MAX_BROADCAST_PAGES; page++) {
-    const { broadcasts, hasMore } = await deps.resend.listBroadcasts(after);
-    const match = broadcasts.find((b) => b.name.includes(marker) && b.status !== 'draft');
-    if (match) return match;
-    if (!hasMore || broadcasts.length === 0) return null;
-    after = broadcasts[broadcasts.length - 1].id;
+/**
+ * The next automatic send as the Automatic screen shows it (fortnightly spec
+ * §5.1): its preview and send times, the post in line, and why it won't go
+ * out, if it won't. Null until a first send date is set.
+ */
+async function nextAutomatic(deps: NewsletterDeps, settings: NewsletterSettings) {
+  if (!settings.first_send_date) return null;
+  const send = nextSlot(settings.first_send_date, deps.now());
+  const [row, lastSentAt, sentSlugs, recent] = await Promise.all([
+    deps.issues.blogSlot(send.toISOString()),
+    deps.issues.lastSentAt(),
+    deps.issues.sentPostSlugs(),
+    deps.issues.recentHeroImages(RECENT_PHOTO_ISSUES),
+  ]);
+  const posts = deps.posts();
+  const post = row?.post_slug ? (posts.find((p) => p.slug === row.post_slug) ?? null) : chooseNextPost(posts, sentSlugs, recent);
+  let blocked: string | null = null;
+  if (row?.status === 'skipped') blocked = row.reason;
+  else if (lastSentAt && !gapAllows(lastSentAt, send)) blocked = gapReason(lastSentAt);
+  else if (!post) blocked = NO_POST_LEFT;
+  return {
+    preview_at: new Date(send.getTime() - PREVIEW_LEAD_MS).toISOString(),
+    send_at: send.toISOString(),
+    post: post ? { slug: post.slug, title: post.title } : null,
+    blocked,
+  };
+}
+
+async function getSettings({ deps, reply }: Ctx): Promise<Response> {
+  const settings = await deps.settings.get();
+  return reply({ settings, next: await nextAutomatic(deps, settings) });
+}
+
+async function putSettings({ req, deps, admin, reply }: Ctx): Promise<Response> {
+  const body = await readJsonBody(req, 16 * 1024);
+  if (!body.ok) return reply({ error: body.error }, body.status);
+  const parsed = settingsSchema.safeParse(body.value);
+  if (!parsed.success) return reply({ error: parsed.error.issues[0]?.message ?? 'Please check the settings.' }, 400);
+  const settings = await deps.settings.save(parsed.data, admin.email);
+  await deps.db.audit({
+    action: 'NEWSLETTER_SETTINGS',
+    actorEmail: admin.email,
+    resourceType: 'newsletter_settings',
+    metadata: {
+      auto_enabled: settings.auto_enabled,
+      first_send_date: settings.first_send_date,
+      preview_recipients: settings.preview_recipients.length,
+      panel_enabled: settings.panel_enabled,
+    },
+    ip: clientIp(req),
+  });
+  return reply({ settings, next: await nextAutomatic(deps, settings) });
+}
+
+/** Every post for the Swap post dialog, newest first, marking sent ones and those without a photo. */
+async function listPosts({ deps, reply }: Ctx): Promise<Response> {
+  const sent = await deps.issues.sentPostSlugs();
+  return reply({
+    posts: deps.posts().map((p) => ({
+      slug: p.slug,
+      title: p.title,
+      date: p.date,
+      has_image: p.image !== null,
+      sent: sent.includes(p.slug),
+    })),
+  });
+}
+
+/** Points a scheduled blog issue at another post, refilling its fields (fortnightly spec §5.4). */
+async function swap({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
+  const body = await readJsonBody(req, 1024);
+  if (!body.ok) return reply({ error: body.error }, body.status);
+  const parsed = swapSchema.safeParse(body.value);
+  if (!parsed.success) return reply({ error: 'Choose a post.' }, 400);
+  const issue = await deps.issues.get(id);
+  if (!issue) return reply({ error: 'Issue not found' }, 404);
+  if (issue.kind !== 'blog' || issue.status !== 'scheduled') {
+    return reply({ error: 'Only a scheduled newsletter can change its post.', issue }, 409);
   }
-  return null;
+  if (sendTimePassed(deps, issue.scheduled_for)) return reply({ error: SEND_TIME_PASSED, issue }, 409);
+  const post = deps.posts().find((p) => p.slug === parsed.data.slug);
+  if (!post) return reply({ error: "That post isn't in the list." }, 404);
+
+  const fields = blogIssueFields(post, todayInIndia(new Date(issue.scheduled_for as string)));
+  const saved = await deps.issues.saveDraft(id, fields, admin.email, issue.updated_at);
+  if (!saved) {
+    return reply({ error: 'Someone changed this newsletter just now. Reload, then try again.', issue: await deps.issues.get(id) }, 409);
+  }
+  await deps.db.audit({
+    action: 'NEWSLETTER_ISSUE_SWAP',
+    actorEmail: admin.email,
+    resourceType: 'newsletter_issue',
+    resourceId: id,
+    metadata: { from: issue.post_slug, to: post.slug },
+    ip: clientIp(req),
+  });
+  return reply({ issue: saved });
+}
+
+/** Skips this fortnight's automatic newsletter. Its post isn't used up (fortnightly spec §5.4). */
+async function skip({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
+  const issue = await deps.issues.setOutcome(id, ['scheduled'], 'skipped', `Skipped in /arel-ops by ${admin.email}.`);
+  if (!issue) {
+    const current = await deps.issues.get(id);
+    if (!current) return reply({ error: 'Issue not found' }, 404);
+    return reply({ error: 'Only a scheduled newsletter can be skipped.', issue: current }, 409);
+  }
+  await deps.db.audit({
+    action: 'NEWSLETTER_ISSUE_SKIP',
+    actorEmail: admin.email,
+    resourceType: 'newsletter_issue',
+    resourceId: id,
+    metadata: { post: issue.post_slug, scheduled_for: issue.scheduled_for },
+    ip: clientIp(req),
+  });
+  return reply({ issue });
 }

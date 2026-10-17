@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import type { BlockNode, BodyDoc, InlineNode, IssueForRender, ListItemNode, Mark, ParagraphNode } from './content';
+import type { NewsletterPost } from './posts';
 import {
   SIZE_MAX_BYTES,
   UNSUBSCRIBE_PLACEHOLDER,
@@ -345,6 +346,46 @@ export function sendProblems({ issue, html, bytes, subscribed, imagePrefixes }: 
   if (!html.includes(UNSUBSCRIBE_PLACEHOLDER)) problems.push('The email is missing its Unsubscribe link.');
   if (subscribed < 1) problems.push('There are no subscribers to send to.');
   return problems;
+}
+
+/**
+ * The one place a blog post fills an issue (fortnightly spec §5.3): used when
+ * the automatic run schedules an issue and when staff swap its post.
+ */
+export function blogIssueFields(
+  post: NewsletterPost,
+  sendIndiaDate: string,
+): IssueDraft & { post_slug: string; reading_minutes: number } {
+  return {
+    subject: post.title.slice(0, ISSUE_LIMITS.subject),
+    preheader: post.excerpt.slice(0, ISSUE_LIMITS.preheader),
+    issue_date: sendIndiaDate,
+    title: post.title.slice(0, ISSUE_LIMITS.title),
+    hero_image_url: post.image,
+    hero_image_alt: post.title.slice(0, ISSUE_LIMITS.heroAlt),
+    body: EMPTY_BODY,
+    share_url: post.url,
+    kicker: post.kicker.slice(0, ISSUE_LIMITS.kicker),
+    intro: post.intro.slice(0, ISSUE_LIMITS.intro),
+    question: '',
+    post_slug: post.slug,
+    reading_minutes: Math.min(120, Math.max(1, Math.round(post.readingMinutes))),
+  };
+}
+
+/** The blog post an article link points at (…/blogs/<slug>/ on the site), or null. */
+export function postSlugFromLink(shareUrl: string | null): string | null {
+  const href = resolveHref(shareUrl, NEWSLETTER_SITE_URL);
+  if (!href) return null;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (!/^(www\.)?hopetrustindia\.com$/i.test(url.hostname)) return null;
+  const match = /^\/blogs\/([a-z0-9-]+)\/?$/i.exec(url.pathname);
+  return match ? match[1].toLowerCase() : null;
 }
 
 /** What Check status looks for in a broadcast's name (spec §9.1 step 8). */

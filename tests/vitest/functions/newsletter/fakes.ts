@@ -14,7 +14,63 @@ import {
 import type { NewsletterDeps } from '@/netlify/functions/_shared/newsletter-deps.mts';
 import { ResendError, type BroadcastInput, type EmailInput, type ResendClient } from '@/netlify/functions/_shared/resend.mts';
 import type { IssueRow, IssueStatus, IssueSummary } from '@/lib/newsletter/issue';
-import type { ImageStorage, IssuesDb } from '@/netlify/functions/_shared/newsletter-issues-db.mts';
+import type { ImageStorage, IssuesDb, SettingsStore } from '@/netlify/functions/_shared/newsletter-issues-db.mts';
+import { DEFAULT_SETTINGS, type NewsletterSettings } from '@/lib/newsletter/settings';
+import type { NewsletterPost } from '@/lib/newsletter/posts';
+
+/** Three posts, newest first: two with an email photo, one without. */
+export const POSTS: NewsletterPost[] = [
+  {
+    slug: 'no-photo-post',
+    title: 'A Post Without a Photo',
+    date: '2025-12-25T09:00:00',
+    excerpt: 'No photo here.',
+    intro: 'This post has no featured image, so the newsletter never picks it on its own.',
+    kicker: 'A moment for yourself',
+    image: null,
+    readingMinutes: 4,
+    url: 'https://hopetrustindia.com/blogs/no-photo-post/',
+  },
+  {
+    slug: 'the-most-important-connection-you-can-have-with-yourself',
+    title: 'The Most Important Connection You Can Have: With Yourself',
+    date: '2025-12-20T11:30:02',
+    excerpt: 'Strengthen your self-connection.',
+    intro: 'Before you can love, trust, or genuinely know another person, you must first reconcile with yourself.',
+    kicker: 'A moment for yourself',
+    image: 'https://images.unsplash.com/photo-1?w=1200&h=750&fit=crop&fm=jpg&q=80',
+    readingMinutes: 9,
+    url: 'https://hopetrustindia.com/blogs/the-most-important-connection-you-can-have-with-yourself/',
+  },
+  {
+    slug: 'surrender-to-win',
+    title: 'Surrender to Win: The Liberating Paradox at the Heart of All Growth',
+    date: '2025-11-08T11:22:02',
+    excerpt: 'Letting go.',
+    intro: 'Surrender sounds like losing, yet in recovery it is often the first real win, the moment the fight ends.',
+    kicker: 'Addiction',
+    image: 'https://hopetrustindia.com/images/blog/surrender.jpg',
+    readingMinutes: 6,
+    url: 'https://hopetrustindia.com/blogs/surrender-to-win/',
+  },
+];
+
+/** newsletter_settings in memory: one row, as section 7 creates it. */
+export function createMemorySettings() {
+  let row: NewsletterSettings = structuredClone(DEFAULT_SETTINGS);
+  const saves: { settings: NewsletterSettings; actor: string }[] = [];
+  const store: SettingsStore = {
+    async get() {
+      return structuredClone(row);
+    },
+    async save(settings, actor) {
+      row = structuredClone(settings);
+      saves.push({ settings: structuredClone(settings), actor });
+      return structuredClone(row);
+    },
+  };
+  return { store, saves };
+}
 
 export const SEGMENT = 'segment-newsletter';
 export const SITE = 'https://hopetrustindia.com';
@@ -647,11 +703,14 @@ export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
   const issueStore = createMemoryIssues(clock.now);
   const images = createFakeImages(IMAGES_BASE);
   const resend = createFakeResend();
+  const settings = createMemorySettings();
   /** Every wait a handler asked for, in ms. The fake returns at once and leaves the clock alone. */
   const sleeps: number[] = [];
   const deps: NewsletterDeps = {
     db: memory.db,
     issues: issueStore.issues,
+    settings: settings.store,
+    posts: () => POSTS,
     images: images.storage,
     resend: resend.client,
     config: {
@@ -668,7 +727,7 @@ export function makeDeps(overrides: Partial<NewsletterDeps> = {}) {
     verifyAdmin: (req) => (req.headers.get('authorization') === `Bearer ${ADMIN_TOKEN}` ? { email: ADMIN_EMAIL } : null),
     ...overrides,
   };
-  return { deps, clock, memory, issueStore, images, resend, sleeps };
+  return { deps, clock, memory, issueStore, images, resend, sleeps, settings };
 }
 
 export function jsonRequest(url: string, method: string, body?: unknown, headers: Record<string, string> = {}): Request {

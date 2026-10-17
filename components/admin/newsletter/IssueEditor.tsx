@@ -161,7 +161,8 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     try {
       const detail = await getIssue(token, id);
       adopt(detail.issue);
-      setAbout({ me: detail.me, from: detail.from, subscribed: detail.subscribed });
+      const { issue: _issue, ...about } = detail;
+      setAbout(about);
       const backup = readBackup(id);
       const usable =
         backup &&
@@ -287,7 +288,8 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     setDialog('send');
     try {
       const detail = await getIssue(token, id);
-      setAbout({ me: detail.me, from: detail.from, subscribed: detail.subscribed });
+      const { issue: _issue, ...about } = detail;
+      setAbout(about);
     } catch {
       // The count from when the issue opened is still shown.
     }

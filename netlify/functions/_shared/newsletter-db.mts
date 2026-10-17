@@ -28,7 +28,7 @@ export interface AuditEntry {
   action: string;
   actorEmail: string;
   /** admin_audit_log.resource_type: a subscriber unless it says otherwise. */
-  resourceType?: 'newsletter_subscriber' | 'newsletter_issue';
+  resourceType?: 'newsletter_subscriber' | 'newsletter_issue' | 'newsletter_settings';
   resourceId?: string | null;
   metadata?: Record<string, unknown>;
   ip?: string | null;

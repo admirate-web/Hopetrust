@@ -22,6 +22,8 @@ export interface NewsletterPost {
 }
 
 export const DEFAULT_KICKER = 'A moment for yourself';
+/** A post whose photo went out in this many of the latest issues waits its turn (spec §5.3). */
+export const RECENT_PHOTO_ISSUES = 6;
 const SITE = 'https://hopetrustindia.com';
 const GENERIC_CATEGORY = 'Blog';
 const MIN_INTRO = 120;

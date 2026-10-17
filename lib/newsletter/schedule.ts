@@ -49,6 +49,13 @@ export function gapAllows(lastSentAt: string | null, at: Date): boolean {
   return next === null || todayInIndia(at) >= next;
 }
 
+/** Why an automatic newsletter doesn't go out (fortnightly spec §5.3, §5.5); staff read these. */
+export const NO_SUBSCRIBERS = 'There are no subscribers.';
+export const NO_POST_LEFT = 'Every blog post with a usable photo has been sent.';
+export function gapReason(lastSentAt: string): string {
+  return `A newsletter went out on ${formatSlot(new Date(lastSentAt))}, less than 14 days before.`;
+}
+
 /** "Tue 20 Oct": the India day of `at`. */
 export function formatSlot(at: Date): string {
   const india = new Date(at.getTime() + IST_MS);

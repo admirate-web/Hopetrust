@@ -4,10 +4,47 @@ import {
   UnauthorizedError,
   checkIssue,
   createIssue,
+  getSettings,
+  listPosts,
   saveIssue,
+  saveSettings,
   sendIssue,
   sendTestIssue,
+  skipIssue,
+  swapIssuePost,
 } from '@/lib/newsletter-admin';
+import { DEFAULT_SETTINGS } from '@/lib/newsletter/settings';
+
+describe('the Hope Letter calls', () => {
+  it('reads and saves the settings at action=settings', async () => {
+    const reply = { settings: DEFAULT_SETTINGS, next: null };
+    let fetchMock = respond(200, reply);
+    expect(await getSettings('tkn')).toEqual(reply);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/admin-newsletter-issues?action=settings');
+    fetchMock = respond(200, reply);
+    await saveSettings('tkn', DEFAULT_SETTINGS);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin-newsletter-issues?action=settings',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify(DEFAULT_SETTINGS) }),
+    );
+  });
+
+  it('lists posts, and swaps or skips with POSTs to the right actions', async () => {
+    const posts = [{ slug: 'a', title: 'A', date: '2025-12-20', has_image: true, sent: false }];
+    let fetchMock = respond(200, { posts });
+    expect(await listPosts('tkn')).toEqual(posts);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/admin-newsletter-issues?action=posts');
+    fetchMock = respond(200, { issue: { id: 'i' } });
+    expect(await swapIssuePost('tkn', 'i', 'a')).toEqual({ id: 'i' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin-newsletter-issues?id=i&action=swap',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ slug: 'a' }) }),
+    );
+    fetchMock = respond(200, { issue: { id: 'i', status: 'skipped' } });
+    expect(await skipIssue('tkn', 'i')).toEqual({ id: 'i', status: 'skipped' });
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/admin-newsletter-issues?id=i&action=skip');
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

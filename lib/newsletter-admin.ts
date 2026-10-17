@@ -6,6 +6,8 @@
 import type { ImportRow } from '@/lib/newsletter/import';
 import type { AdminSubscriber, SubscriberSource, SubscriberStatus } from '@/lib/newsletter/subscriber';
 import type { IssueRow, IssueSummary } from '@/lib/newsletter/issue';
+import type { BookPanel } from '@/lib/newsletter/render';
+import type { NewsletterSettings } from '@/lib/newsletter/settings';
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -171,11 +173,44 @@ export class IssueApiError extends Error {
   }
 }
 
-/** Who is signed in, the sender, and how many people a send reaches. */
+/**
+ * Who is signed in, the sender, how many people a send reaches, and what the
+ * fortnightly rules need: the next issue number, the last send, the first day
+ * the next may go out, the book panel, and the next automatic send.
+ */
 export interface IssueContext {
   me: string;
   from: string;
   subscribed: number;
+  next_issue_number: number;
+  last_sent_at: string | null;
+  /** YYYY-MM-DD in India, or null when nothing has been sent. */
+  next_allowed_date: string | null;
+  panel: BookPanel | null;
+  next_send_at: string | null;
+}
+
+/** The next automatic send, as the Automatic screen shows it. */
+export interface AutomaticNext {
+  preview_at: string;
+  send_at: string;
+  post: { slug: string; title: string } | null;
+  /** Why it won't go out, when it won't. */
+  blocked: string | null;
+}
+
+export interface SettingsReply {
+  settings: NewsletterSettings;
+  next: AutomaticNext | null;
+}
+
+/** A post in the Swap post dialog. */
+export interface PostChoice {
+  slug: string;
+  title: string;
+  date: string;
+  has_image: boolean;
+  sent: boolean;
 }
 
 export interface IssueList extends IssueContext {
@@ -272,4 +307,28 @@ export function sendIssue(token: string, id: string): Promise<{ issue: IssueRow;
 
 export function checkIssue(token: string, id: string): Promise<{ issue: IssueRow; found: boolean }> {
   return issuesCall(token, queryString({ id, action: 'check' }), post());
+}
+
+/** The Hope Letter's settings and the next automatic send (fortnightly spec §5.1). */
+export function getSettings(token: string): Promise<SettingsReply> {
+  return issuesCall(token, queryString({ action: 'settings' }));
+}
+
+export function saveSettings(token: string, settings: NewsletterSettings): Promise<SettingsReply> {
+  return issuesCall(token, queryString({ action: 'settings' }), { method: 'PUT', body: JSON.stringify(settings) });
+}
+
+/** Every blog post for the Swap post dialog, newest first. */
+export async function listPosts(token: string): Promise<PostChoice[]> {
+  return (await issuesCall<{ posts: PostChoice[] }>(token, queryString({ action: 'posts' }))).posts;
+}
+
+/** Points a scheduled newsletter at another post; its fields are refilled from it. */
+export async function swapIssuePost(token: string, id: string, slug: string): Promise<IssueRow> {
+  return (await issuesCall<{ issue: IssueRow }>(token, queryString({ id, action: 'swap' }), post({ slug }))).issue;
+}
+
+/** Skips this fortnight's automatic newsletter. */
+export async function skipIssue(token: string, id: string): Promise<IssueRow> {
+  return (await issuesCall<{ issue: IssueRow }>(token, queryString({ id, action: 'skip' }), post())).issue;
 }

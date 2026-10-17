@@ -6,6 +6,39 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IssueDraft, IssueRow, IssueStatus, IssueSummary } from '../../../lib/newsletter/issue';
+import { DEFAULT_SETTINGS, type NewsletterSettings } from '../../../lib/newsletter/settings';
+
+/** What a save writes: the editable fields, plus the post a save or swap points the issue at. */
+export type IssueSaveFields = IssueDraft & Partial<Pick<IssueRow, 'post_slug' | 'reading_minutes'>>;
+
+/** newsletter_settings: one row (Database/newsletter.sql §7). */
+export interface SettingsStore {
+  get(): Promise<NewsletterSettings>;
+  save(settings: NewsletterSettings, actor: string): Promise<NewsletterSettings>;
+}
+
+const SETTINGS_COLUMNS =
+  'auto_enabled, first_send_date, preview_recipients, panel_enabled, panel_eyebrow, panel_title, panel_text, panel_link_text, panel_url';
+
+export function createSettingsStore(supabase: SupabaseClient): SettingsStore {
+  const table = () => supabase.from('newsletter_settings');
+  return {
+    async get() {
+      const { data, error } = await table().select(SETTINGS_COLUMNS).eq('id', true).maybeSingle();
+      if (error) throw new Error(`newsletter_settings: ${error.message}`);
+      return { ...DEFAULT_SETTINGS, ...((data as Partial<NewsletterSettings> | null) ?? {}) };
+    },
+    async save(settings, actor) {
+      const { data, error } = await table()
+        .update({ ...settings, updated_by: actor })
+        .eq('id', true)
+        .select(SETTINGS_COLUMNS)
+        .single();
+      if (error) throw new Error(`newsletter_settings: ${error.message}`);
+      return { ...DEFAULT_SETTINGS, ...(data as Partial<NewsletterSettings>) };
+    },
+  };
+}
 
 export interface SentFields {
   resend_broadcast_id: string;
@@ -32,7 +65,7 @@ export interface IssuesDb {
   get(id: string): Promise<IssueRow | null>;
   create(fields: IssueDraft, actor: string): Promise<IssueRow>;
   /** Saves a draft's or scheduled issue's fields if unchanged since `ifUpdatedAt`; otherwise null. */
-  saveDraft(id: string, fields: IssueDraft, actor: string, ifUpdatedAt: string): Promise<IssueRow | null>;
+  saveDraft(id: string, fields: IssueSaveFields, actor: string, ifUpdatedAt: string): Promise<IssueRow | null>;
   /** Deletes a draft; false when there is no draft with that id. */
   deleteDraft(id: string): Promise<boolean>;
   /** `from` → sending, with who started it and the issue number the email shows; null when it wasn't `from`. */
