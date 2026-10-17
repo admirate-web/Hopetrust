@@ -30,8 +30,12 @@ const MIN_INTRO = 120;
 const MAX_INTRO = 320;
 const UNSPLASH = /^https:\/\/images\.unsplash\.com\//i;
 const EMAIL_SAFE = /\.(jpe?g|png)$/i;
-/** Blocks that aren't prose: headings, lists, images, quotes, tables, code, HTML or MDX, rules, and quotations. */
-const NOT_PROSE = /^(#|[-*+]\s|\d+[.)]\s|!\[|>|\||```|<|import\s|export\s|---|[“"‘'])/;
+/** Blocks that aren't prose: headings, lists, images, quotes, tables, code, HTML or MDX, rules, and quotations (in italics too). */
+const NOT_PROSE = /^(#|[-*+]\s|\d+[.)]\s|!\[|>|\||```|<|import\s|export\s|---|[_*]*[“"‘'])/;
+/** A blank line, or a line break before a heading, ends a block. */
+const BLOCK_END = /\n\s*\n|\n(?= {0,3}#{1,6}\s)/;
+/** An underscore at the edge of a word is markup (_emphasis_, or a stray one); one inside a word is text. */
+const EDGE_UNDERSCORE = /(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/gu;
 const ENTITIES: Record<string, string> = {
   '&amp;': '&',
   '&nbsp;': ' ',
@@ -68,6 +72,7 @@ function clean(block: string): string {
     .replace(/<[^>]+>/g, '')
     .replace(/&[a-z]+;|&#\d+;/gi, (entity) => ENTITIES[entity.toLowerCase()] ?? entity)
     .replace(/\*{1,3}|_{2,3}/g, '')
+    .replace(EDGE_UNDERSCORE, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -88,7 +93,7 @@ function cut(text: string): string {
 
 /** The post's first prose paragraph of at least 120 characters, cleaned and cut (spec §5.3); '' when none qualifies. */
 export function firstParagraph(markdown: string): string {
-  for (const block of String(markdown ?? '').split(/\n\s*\n/)) {
+  for (const block of String(markdown ?? '').split(BLOCK_END)) {
     const raw = block.trim();
     if (!raw || NOT_PROSE.test(raw)) continue;
     const text = clean(raw);

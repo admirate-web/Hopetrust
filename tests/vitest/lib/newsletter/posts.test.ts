@@ -58,6 +58,36 @@ describe('firstParagraph', () => {
     );
   });
 
+  it('drops an underscore at the edge of a word (_emphasis_, or a stray one), and keeps one inside a word', () => {
+    expect(
+      firstParagraph(
+        'If you live with someone who is harmfully involved with alcohol or drugs, you may question your sanity_. ' +
+          'You’re not crazy. You may feel like it, but you are not crazy._',
+      ),
+    ).toBe(
+      'If you live with someone who is harmfully involved with alcohol or drugs, you may question your sanity. ' +
+        'You’re not crazy. You may feel like it, but you are not crazy.',
+    );
+    const markdown =
+      'In a busy world, the demands of _dharma_ (duty), _artha_ (prosperity) and family (_matru devo bhava_) can feel ' +
+      'like a weight we carry alone, says the file_name of no one, and old advice has much to say about it.';
+    expect(firstParagraph(markdown)).toBe(
+      'In a busy world, the demands of dharma (duty), artha (prosperity) and family (matru devo bhava) can feel ' +
+        'like a weight we carry alone, says the file_name of no one, and old advice has much to say about it.',
+    );
+    expect(firstParagraph(`_${LONG}_`)).toBe(LONG);
+  });
+
+  it('skips a quotation set in italics, as it skips a plain one', () => {
+    const quote =
+      '_“Three changes of the spirit do I show you: how the spirit turns into a camel, the camel into a lion, and the lion into a child.”_ —Friedrich Nietzsche';
+    expect(firstParagraph([quote, LONG].join('\n\n'))).toBe(LONG);
+  });
+
+  it('ends a paragraph at a heading that follows it without a blank line', () => {
+    expect(firstParagraph(`${LONG}\n### 2. Poor communication\nWhen partners stop talking, small problems grow.`)).toBe(LONG);
+  });
+
   it('cuts at the last sentence end within 320 characters', () => {
     const one = `${'a'.repeat(149)}.`;
     const two = ` ${'b'.repeat(148)}.`;
@@ -162,5 +192,12 @@ describe('the post index', () => {
         return /[a-z][A-Z]/.test(text) || /[:?!][A-Za-z]/.test(text) || /\s{2,}/.test(text);
       });
     expect(broken).toEqual([]);
+  });
+
+  // The intro is the email's opening paragraph (fortnightly spec §5.3).
+  it('has clean intros: no emphasis or heading marks left', () => {
+    const MARKS = /(^|[^\p{L}\p{N}])_\S|\S_(?![\p{L}\p{N}])|\*|(^|\s)#{1,6}\s/u;
+    const marked = (generated as NewsletterPost[]).filter((post) => MARKS.test(post.intro)).map((post) => post.slug);
+    expect(marked).toEqual([]);
   });
 });
