@@ -391,8 +391,24 @@ export function postSlugFromLink(shareUrl: string | null): string | null {
 /** What Check status looks for in a broadcast's name (spec §9.1 step 8). */
 export const broadcastMarker = (id: string) => `[issue ${id}]`;
 
-/** Resend's name for the broadcast: the subject, then the marker. */
+/** Resend refuses a broadcast name over 70 characters. */
+const MAX_BROADCAST_NAME = 70;
+
+/**
+ * Resend's name for the broadcast: the subject, then the marker. The subject is cut, at a
+ * word where it can be, to fit Resend's limit; the marker stays whole, as Check status finds
+ * the broadcast by it.
+ */
 export function broadcastName(issue: Pick<IssueRow, 'id' | 'subject'>): string {
-  const subject = Array.from(issue.subject.trim()).slice(0, 80).join('');
-  return `${subject || 'Newsletter'} ${broadcastMarker(issue.id)}`;
+  const marker = broadcastMarker(issue.id);
+  const room = MAX_BROADCAST_NAME - marker.length - 1;
+  const subject = issue.subject.trim() || 'Newsletter';
+  if (subject.length <= room) return `${subject} ${marker}`;
+  let cut = '';
+  for (const char of Array.from(subject)) {
+    if (cut.length + char.length > room - 1) break;
+    cut += char;
+  }
+  const words = /\s/.test(subject[cut.length]) ? cut : cut.replace(/\s+\S*$/, '');
+  return `${words.replace(/[\s,;:–—-]+$/, '')}… ${marker}`;
 }

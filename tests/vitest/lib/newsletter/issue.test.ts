@@ -264,9 +264,19 @@ describe('sendProblems', () => {
 });
 
 describe('broadcastName', () => {
-  it('names the broadcast with the subject and the issue id, never splitting an emoji', () => {
+  it('names the broadcast with the subject and the issue id', () => {
     expect(broadcastName({ id: 'abc', subject: ' Know thyself ' })).toBe('Know thyself [issue abc]');
     expect(broadcastName({ id: 'abc', subject: '' })).toBe('Newsletter [issue abc]');
-    expect(broadcastName({ id: 'abc', subject: '😀'.repeat(100) })).toBe(`${'😀'.repeat(80)} [issue abc]`);
+  });
+
+  // Resend refuses a name over 70 characters ("Field `name` has a maximum of 70 items"), found in the live check.
+  it('keeps the name within 70 characters with a real id, cutting the subject at a word and never the marker', () => {
+    const id = 'db92f4ad-ca83-4ab2-b19a-212ec2991ae0';
+    expect(broadcastName({ id, subject: 'The Most Important Connection You Can Have: With Yourself' })).toBe(
+      'The Most Important… [issue db92f4ad-ca83-4ab2-b19a-212ec2991ae0]',
+    );
+    const emoji = broadcastName({ id, subject: '😀'.repeat(100) });
+    expect(emoji).toBe(`${'😀'.repeat(12)}… [issue db92f4ad-ca83-4ab2-b19a-212ec2991ae0]`);
+    expect(emoji.length).toBe(70);
   });
 });
