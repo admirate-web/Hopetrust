@@ -67,6 +67,31 @@ describe('AutomaticScreen', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument();
   });
 
+  it('shows a flipped switch as not saved, and the saved state as what holds, until Save', async () => {
+    show({ settings: ON, next: NEXT });
+    vi.mocked(api.saveSettings).mockImplementation(async (_t, settings) => ({ settings, next: NEXT }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Automatic sending' }));
+    expect(screen.getByText('On')).toBeInTheDocument();
+    expect(screen.getByText('Not saved yet: it stays on until you press Save settings.')).toBeInTheDocument();
+    expect(screen.queryByText(/nothing goes out until it/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    expect(await screen.findByText('Off')).toBeInTheDocument();
+    expect(screen.getByText(/nothing goes out until it/)).toBeInTheDocument();
+    expect(screen.queryByText(/Not saved yet/)).toBeNull();
+  });
+
+  it('says there are unsaved changes until they are saved', async () => {
+    show({ settings: ON, next: NEXT });
+    vi.mocked(api.saveSettings).mockImplementation(async (_t, settings) => ({ settings, next: NEXT }));
+    const recipients = await screen.findByLabelText('Preview recipients');
+    expect(screen.queryByText("You have changes that aren't saved.")).toBeNull();
+    await userEvent.type(recipients, ', b@x.com');
+    expect(screen.getByText("You have changes that aren't saved.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await screen.findByText('Saved.');
+    expect(screen.queryByText("You have changes that aren't saved.")).toBeNull();
+  });
+
   it("shows the server's reason when a save is refused", async () => {
     show({ settings: DEFAULT_SETTINGS, next: null });
     vi.mocked(api.saveSettings).mockRejectedValue(new api.IssueApiError('The first send date must be a Tuesday.', 400, null, []));

@@ -61,6 +61,8 @@ const at10 = (iso: string) => `${formatSlot(new Date(iso))}, 10:00 am`;
 
 export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScreenProps) {
   const [form, setForm] = useState<NewsletterSettings | null>(null);
+  /** The settings as last saved: what the automatic send goes by. */
+  const [saved, setSaved] = useState<NewsletterSettings | null>(null);
   const [recipients, setRecipients] = useState('');
   const [next, setNext] = useState<AutomaticNext | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,6 +79,7 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
 
   const adopt = useCallback((reply: SettingsReply) => {
     setForm(reply.settings);
+    setSaved(reply.settings);
     setRecipients(reply.settings.preview_recipients.join(', '));
     setNext(reply.next);
   }, []);
@@ -114,7 +117,7 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
     }
   }
 
-  if (!form) {
+  if (!form || !saved) {
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-white p-6 text-sm text-gray-600 shadow-sm">
         {error ? (
@@ -129,6 +132,8 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
       </div>
     );
   }
+
+  const unsaved = JSON.stringify(form) !== JSON.stringify(saved) || recipients !== saved.preview_recipients.join(', ');
 
   return (
     <div>
@@ -158,7 +163,12 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className={labelClass}>Automatic sending</p>
-              <p className="text-lg font-bold text-[#00373E]">{form.auto_enabled ? 'On' : 'Off'}</p>
+              <p className="text-lg font-bold text-[#00373E]">{saved.auto_enabled ? 'On' : 'Off'}</p>
+              {form.auto_enabled !== saved.auto_enabled && (
+                <p className="text-xs font-semibold text-amber-700">
+                  {`Not saved yet: it stays ${saved.auto_enabled ? 'on' : 'off'} until you press Save settings.`}
+                </p>
+              )}
             </div>
             <Switch label="Automatic sending" checked={form.auto_enabled} onToggle={() => set('auto_enabled', !form.auto_enabled)} />
           </div>
@@ -198,7 +208,7 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
                 </p>
               )}
               {next.blocked && <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-900">{next.blocked}</p>}
-              {!form.auto_enabled && <p className="text-gray-500">Automatic sending is off, so nothing goes out until it&apos;s switched on.</p>}
+              {!saved.auto_enabled && <p className="text-gray-500">Automatic sending is off, so nothing goes out until it&apos;s switched on.</p>}
             </div>
           ) : (
             <p className="text-sm text-gray-500">Choose a first send date and save to see the next send.</p>
@@ -244,6 +254,7 @@ export default function AutomaticScreen({ token, onUnauthorized }: AutomaticScre
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Save settings
       </button>
+      {unsaved && <p className="mt-2 text-sm font-semibold text-amber-700">You have changes that aren&apos;t saved.</p>}
     </div>
   );
 }
