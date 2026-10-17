@@ -12,7 +12,7 @@ const primary =
 const secondary =
   'inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50';
 
-function Dialog({ title, busy, onClose, children }: { title: string; busy: boolean; onClose: () => void; children: ReactNode }) {
+export function Dialog({ title, busy, onClose, children }: { title: string; busy: boolean; onClose: () => void; children: ReactNode }) {
   // Escape closes the dialog, except while something is running.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -108,6 +108,7 @@ export function SendDialog({
   subscribed,
   busy,
   progress,
+  warning,
   onSend,
   onClose,
 }: {
@@ -116,6 +117,8 @@ export function SendDialog({
   subscribed: number;
   busy: boolean;
   progress: string;
+  /** Shown above the send button, e.g. that this send skips the next automatic newsletter. */
+  warning?: string;
   onSend: () => void;
   onClose: () => void;
 }) {
@@ -138,6 +141,7 @@ export function SendDialog({
       <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
         This can&apos;t be undone. Once it is sent, the issue can&apos;t be changed.
       </p>
+      {warning && <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-900">{warning}</p>}
       {progress && (
         <p role="status" className="mt-3 flex items-center gap-2 text-sm text-gray-600">
           <Loader2 className="h-4 w-4 animate-spin" /> {progress}

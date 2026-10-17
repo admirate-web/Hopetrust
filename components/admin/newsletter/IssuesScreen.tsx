@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, FilePlus2, Loader2 } from 'lucide-react';
 import { UnauthorizedError, createIssue, listIssues, type IssueList } from '@/lib/newsletter-admin';
 import { formatIssueDate } from '@/lib/newsletter/render';
+import { formatSlot } from '@/lib/newsletter/schedule';
 import { ISSUE_STATUS } from './issue-status';
 import { formatDate } from './SubscribersScreen';
 
@@ -118,7 +119,11 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
                 </td>
               </tr>
             ) : (
-              data?.issues.map((issue) => {
+              // The scheduled newsletter comes first: it's the next thing that goes out.
+              data?.issues
+                .slice()
+                .sort((a, b) => Number(b.status === 'scheduled') - Number(a.status === 'scheduled'))
+                .map((issue) => {
                 const status = ISSUE_STATUS[issue.status];
                 return (
                   <tr key={issue.id} className="hover:bg-[#F7F6F4]/60">
@@ -133,7 +138,11 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
                     </td>
                     <td className="px-4 py-3 text-gray-600">{issueDate(issue.issue_date)}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.className}`}>{status.label}</span>
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.className}`}>
+                        {issue.status === 'scheduled' && issue.scheduled_for
+                          ? `${status.label} · ${formatSlot(new Date(issue.scheduled_for))}`
+                          : status.label}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{issue.recipient_count ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(issue.sent_at)}</td>

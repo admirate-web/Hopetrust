@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import type { BodyDoc } from '@/lib/newsletter/content';
 import { toDraft, type IssueRow } from '@/lib/newsletter/issue';
+import { formatSlot, sendTimeOn } from '@/lib/newsletter/schedule';
 
 // IMAGES_BASE is read as the preview module loads, so the URL has to be set first.
 vi.hoisted(() => {
@@ -20,6 +21,9 @@ vi.mock('@/lib/newsletter-admin', async (importOriginal) => {
     checkIssue: vi.fn(),
     deleteIssue: vi.fn(),
     syncUntilDone: vi.fn(),
+    swapIssuePost: vi.fn(),
+    skipIssue: vi.fn(),
+    listPosts: vi.fn(),
   };
 });
 vi.mock('@/lib/newsletter/issue-image', () => ({ uploadIssueImage: vi.fn() }));
@@ -269,7 +273,7 @@ describe('IssueEditor', () => {
 
   it('closes the test dialog to show why saving first failed, and sends no test', async () => {
     open();
-    await userEvent.type(await screen.findByLabelText(/Blog link/), 'hopetrustindia.com/blogs/');
+    await userEvent.type(await screen.findByLabelText('Article link'), 'hopetrustindia.com/blogs/');
     vi.mocked(api.saveIssue).mockRejectedValue(new api.IssueApiError(SHARE_LINK_ERROR, 400, null, []));
     await userEvent.click(screen.getByRole('button', { name: /Send test/ }));
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Send test/ }));
@@ -280,7 +284,7 @@ describe('IssueEditor', () => {
 
   it('closes the send dialog to show why saving first failed, and sends nothing', async () => {
     open();
-    await userEvent.type(await screen.findByLabelText(/Blog link/), 'hopetrustindia.com/blogs/');
+    await userEvent.type(await screen.findByLabelText('Article link'), 'hopetrustindia.com/blogs/');
     vi.mocked(api.saveIssue).mockRejectedValue(new api.IssueApiError(SHARE_LINK_ERROR, 400, null, []));
     const send = screen.getByRole('button', { name: /Send to subscribers/ });
     await waitFor(() => expect(send).toBeEnabled());
@@ -308,5 +312,106 @@ describe('IssueEditor', () => {
     vi.mocked(api.checkIssue).mockResolvedValue({ issue: SENT, found: true });
     await userEvent.click(await screen.findByRole('button', { name: /Check status/ }));
     expect(await screen.findByText('Resend sent it, so the issue is now marked sent.')).toBeInTheDocument();
+  });
+});
+
+// The Hope Letter (fortnightly plan Task 8). Far-future dates keep these
+// independent of today's date.
+const FULL_ABOUT = {
+  ...ABOUT,
+  next_issue_number: 2,
+  last_sent_at: null,
+  next_allowed_date: null,
+  panel: null,
+  next_send_at: null,
+};
+const BLOG: IssueRow = {
+  ...ISSUE,
+  kind: 'blog',
+  status: 'scheduled',
+  scheduled_for: '2099-10-20T04:30:00.000Z',
+  preview_sent_at: '2099-10-18T04:30:00.000Z',
+  reason: null,
+  post_slug: 'the-most-important-connection-you-can-have-with-yourself',
+  share_url: 'https://hopetrustindia.com/blogs/the-most-important-connection-you-can-have-with-yourself/',
+  kicker: 'A moment for yourself',
+  intro: 'Before you can love, trust, or genuinely know another person, you must first reconcile with yourself.',
+  question: '',
+  reading_minutes: 9,
+  issue_number: null,
+};
+
+function openWith(issue: IssueRow, about: Partial<typeof FULL_ABOUT> = {}) {
+  vi.mocked(api.getIssue).mockResolvedValue({ issue, ...FULL_ABOUT, ...about });
+  render(<IssueEditor token="tkn" id={issue.id} onClose={() => {}} onUnauthorized={() => {}} />);
+}
+
+describe('IssueEditor: The Hope Letter', () => {
+  it('gives a manual issue a kicker, a question and an article link', async () => {
+    openWith(ISSUE);
+    expect(await screen.findByLabelText('Kicker')).toHaveValue('');
+    expect(screen.getByLabelText('Question')).toHaveValue('');
+    expect(screen.getByLabelText('Article link')).toHaveValue('');
+    expect(screen.queryByText('Blog link for the Share button')).toBeNull();
+  });
+
+  it('shows a scheduled blog issue with its send time, an intro instead of the body, Swap and Skip, and no Send', async () => {
+    openWith(BLOG);
+    expect(await screen.findByText(`Goes out ${formatSlot(new Date(BLOG.scheduled_for as string))}, 10:00 am`)).toBeInTheDocument();
+    expect(screen.getByLabelText('Intro')).toHaveValue(BLOG.intro);
+    expect(screen.queryByTestId('body')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Swap post' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Skip this fortnight' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Send to subscribers' })).toBeNull();
+  });
+
+  it('skips this fortnight after asking, and shows it skipped', async () => {
+    openWith(BLOG);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip this fortnight' }));
+    expect(api.skipIssue).not.toHaveBeenCalled();
+    vi.mocked(api.skipIssue).mockResolvedValue({ ...BLOG, status: 'skipped', reason: 'Skipped in /arel-ops by admin@hopetrustindia.com.' });
+    await userEvent.click(screen.getByRole('button', { name: 'Skip this fortnight' }));
+    expect(api.skipIssue).toHaveBeenCalledWith('tkn', BLOG.id);
+    expect(await screen.findByText('Skipped in /arel-ops by admin@hopetrustindia.com.')).toBeInTheDocument();
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText('Intro')).toBeDisabled();
+  });
+
+  it('swaps the post after asking, through the post picker', async () => {
+    openWith(BLOG);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(api.listPosts).mockResolvedValue([
+      { slug: 'surrender-to-win', title: 'Surrender to Win', date: '2025-11-08T11:22:02', has_image: true, sent: false },
+    ]);
+    vi.mocked(api.swapIssuePost).mockResolvedValue({ ...BLOG, post_slug: 'surrender-to-win', subject: 'Surrender to Win', title: 'Surrender to Win' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Swap post' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choose a post' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Surrender to Win/ }));
+    expect(api.swapIssuePost).toHaveBeenCalledWith('tkn', BLOG.id, 'surrender-to-win');
+    expect(await screen.findByText('Swapped to “Surrender to Win”.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('Surrender to Win');
+  });
+
+  it('shows a missed blog issue read-only, with the reason', async () => {
+    openWith({ ...BLOG, status: 'missed', reason: "It was more than 3 hours late, so it wasn't sent." });
+    expect(await screen.findByText("It was more than 3 hours late, so it wasn't sent.")).toBeInTheDocument();
+    expect(screen.getByLabelText('Intro')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Save$/ })).toBeNull();
+  });
+
+  it('holds back a manual send while the 14-day gap runs, naming the next date', async () => {
+    openWith(ISSUE, { next_allowed_date: '2099-01-06' });
+    expect(await screen.findByText(`The next newsletter can go out on ${formatSlot(sendTimeOn('2099-01-06'))}.`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send to subscribers' })).toBeDisabled();
+  });
+
+  it('warns in the send dialog when the send will skip the next automatic newsletter', async () => {
+    const nextSend = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    openWith(ISSUE, { next_send_at: nextSend });
+    vi.mocked(api.getIssue).mockResolvedValue({ issue: ISSUE, ...FULL_ABOUT, next_send_at: nextSend });
+    await userEvent.click(await screen.findByRole('button', { name: 'Send to subscribers' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Send to subscribers' });
+    expect(within(dialog).getByText(`This will skip the automatic newsletter on ${formatSlot(new Date(nextSend))}.`)).toBeInTheDocument();
   });
 });

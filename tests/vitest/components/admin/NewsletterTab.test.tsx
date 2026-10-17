@@ -12,6 +12,9 @@ vi.mock('@/components/admin/newsletter/IssuesScreen', () => ({
 vi.mock('@/components/admin/newsletter/SubscribersScreen', () => ({
   default: () => <h2>Newsletter subscribers</h2>,
 }));
+vi.mock('@/components/admin/newsletter/AutomaticScreen', () => ({
+  default: () => <h2>Automatic newsletter</h2>,
+}));
 vi.mock('@/components/admin/newsletter/IssueEditor', () => ({
   default: ({ id, onClose, onDirtyChange }: { id: string; onClose: () => void; onDirtyChange?: (dirty: boolean) => void }) => (
     <div>
@@ -53,5 +56,12 @@ describe('NewsletterTab', () => {
     confirm.mockReturnValue(true);
     await userEvent.click(screen.getByRole('tab', { name: 'Subscribers' }));
     expect(screen.getByRole('heading', { name: 'Newsletter subscribers' })).toBeInTheDocument();
+  });
+
+  it('has a third screen for the automatic newsletter', async () => {
+    render(<NewsletterTab token="tkn" onUnauthorized={() => {}} />);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Issues', 'Subscribers', 'Automatic']);
+    await userEvent.click(screen.getByRole('tab', { name: 'Automatic' }));
+    expect(screen.getByRole('heading', { name: 'Automatic newsletter' })).toBeInTheDocument();
   });
 });

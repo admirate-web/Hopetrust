@@ -72,4 +72,38 @@ describe('IssuesScreen', () => {
     render(<IssuesScreen token="tkn" onUnauthorized={onUnauthorized} onOpen={() => {}} />);
     await vi.waitFor(() => expect(onUnauthorized).toHaveBeenCalled());
   });
+
+  it('lists the scheduled newsletter first, with its send day, and labels skipped and missed ones', async () => {
+    const row = (id: string, status: string, scheduled_for: string | null, subject: string) => ({
+      id,
+      subject,
+      issue_date: '2026-10-20',
+      status,
+      recipient_count: null,
+      sent_at: null,
+      last_error: null,
+      updated_at: '2026-10-18T04:30:00.000Z',
+      kind: scheduled_for ? 'blog' : 'manual',
+      scheduled_for,
+      reason: null,
+    });
+    vi.mocked(api.listIssues).mockResolvedValue({
+      issues: [
+        row('m', 'draft', null, 'A draft by hand'),
+        row('s', 'scheduled', '2026-10-20T04:30:00.000Z', 'The Most Important Connection'),
+        row('k', 'skipped', '2026-10-06T04:30:00.000Z', 'No newsletter on Tue 6 Oct'),
+        row('x', 'missed', '2026-09-22T04:30:00.000Z', 'Missed one'),
+      ],
+      me: 'a@x',
+      from: 'Hope Trust <newsletter@hopetrustindia.com>',
+      subscribed: 3,
+    } as unknown as Awaited<ReturnType<typeof api.listIssues>>);
+    render(<IssuesScreen token="tkn" onUnauthorized={() => {}} onOpen={() => {}} />);
+    await screen.findByText('The Most Important Connection');
+    const rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('The Most Important Connection');
+    expect(rows[1]).toHaveTextContent('Scheduled · Tue 20 Oct');
+    expect(screen.getByText('Skipped')).toBeInTheDocument();
+    expect(screen.getByText('Missed')).toBeInTheDocument();
+  });
 });

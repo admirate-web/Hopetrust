@@ -8,7 +8,7 @@ import { useState, type ReactNode } from 'react';
 import { Monitor, Smartphone } from 'lucide-react';
 import type { IssueForRender } from '@/lib/newsletter/content';
 import { issueRenderOptions, kb, normalizeBody } from '@/lib/newsletter/issue';
-import { SIZE_MAX_BYTES, SIZE_WARN_BYTES, newsletterImagesBase, renderIssueHtml } from '@/lib/newsletter/render';
+import { SIZE_MAX_BYTES, SIZE_WARN_BYTES, newsletterImagesBase, renderIssueHtml, type BookPanel } from '@/lib/newsletter/render';
 
 /** The public image bucket of this site's Supabase project. */
 export const IMAGES_BASE = newsletterImagesBase(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '');
@@ -22,12 +22,16 @@ export interface RenderedPreview {
   imagePrefixes: string[];
 }
 
-export function renderPreview(issue: IssueForRender, imagesBase = IMAGES_BASE): RenderedPreview {
+export function renderPreview(
+  issue: IssueForRender,
+  imagesBase = IMAGES_BASE,
+  extra: { panel?: BookPanel | null; nextIssueNumber?: number | null } = {},
+): RenderedPreview {
   const clean = { ...issue, body: normalizeBody(issue.body) };
-  const sendOptions = issueRenderOptions(imagesBase, 'send');
+  const sendOptions = issueRenderOptions(imagesBase, 'send', extra);
   const send = renderIssueHtml(clean, sendOptions);
   return {
-    html: renderIssueHtml(clean, issueRenderOptions(imagesBase, 'preview')).html,
+    html: renderIssueHtml(clean, issueRenderOptions(imagesBase, 'preview', extra)).html,
     sendHtml: send.html,
     bytes: send.bytes,
     imagePrefixes: sendOptions.imagePrefixes,

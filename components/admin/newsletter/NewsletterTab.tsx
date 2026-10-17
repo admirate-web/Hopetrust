@@ -1,6 +1,6 @@
 'use client';
 
-// The Newsletter tab in /arel-ops (spec §8): Issues and Subscribers. The issue
+// The Newsletter tab in /arel-ops (spec §8): Issues, Subscribers and Automatic. The issue
 // editor, with the TipTap editor inside it, loads only when an issue is
 // opened, so the rest of the dashboard stays light.
 
@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import IssuesScreen from './IssuesScreen';
 import SubscribersScreen from './SubscribersScreen';
+import AutomaticScreen from './AutomaticScreen';
 
 const IssueEditor = dynamic(() => import('./IssueEditor'), {
   ssr: false,
@@ -25,7 +26,7 @@ export interface NewsletterTabProps {
   onUnauthorized: () => void;
 }
 
-type Screen = 'issues' | 'subscribers';
+type Screen = 'issues' | 'subscribers' | 'automatic';
 const LEAVE = 'You have unsaved changes in this issue. Leave without saving?';
 
 /** The Newsletter tab in /arel-ops. */
@@ -60,8 +61,11 @@ export default function NewsletterTab({ token, onUnauthorized }: NewsletterTabPr
       <div role="tablist" aria-label="Newsletter screens" className="mb-5 inline-flex gap-1 rounded-2xl bg-[#F7F6F4] p-1">
         {tab('issues', 'Issues')}
         {tab('subscribers', 'Subscribers')}
+        {tab('automatic', 'Automatic')}
       </div>
-      {screen === 'subscribers' ? (
+      {screen === 'automatic' ? (
+        <AutomaticScreen token={token} onUnauthorized={onUnauthorized} />
+      ) : screen === 'subscribers' ? (
         <SubscribersScreen token={token} onUnauthorized={onUnauthorized} />
       ) : openId ? (
         <IssueEditor

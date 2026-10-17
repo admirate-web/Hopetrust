@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   AlertTriangle,
   ArrowLeft,
+  CalendarClock,
   CheckCircle2,
   ExternalLink,
   ImagePlus,
@@ -17,11 +18,14 @@ import {
   RefreshCw,
   Save,
   Send,
+  Shuffle,
+  SkipForward,
   Trash2,
 } from 'lucide-react';
 import type { BodyDoc } from '@/lib/newsletter/content';
-import { ISSUE_LIMITS, draftKey, sendProblems, toDraft, type IssueRow } from '@/lib/newsletter/issue';
+import { ISSUE_LIMITS, draftKey, sendProblems, toDraft, todayInIndia, type IssueRow } from '@/lib/newsletter/issue';
 import { uploadIssueImage } from '@/lib/newsletter/issue-image';
+import { MIN_GAP_DAYS, addDays, formatSlot, sendTimeOn } from '@/lib/newsletter/schedule';
 import {
   IssueApiError,
   UnauthorizedError,
@@ -31,6 +35,8 @@ import {
   saveIssue,
   sendIssue,
   sendTestIssue,
+  skipIssue,
+  swapIssuePost,
   syncUntilDone,
   type IssueContext,
   type IssueDraftInput,
@@ -38,6 +44,7 @@ import {
 import BodyEditor from './BodyEditor';
 import IssuePreview, { renderPreview } from './IssuePreview';
 import { SendDialog, TestSendDialog } from './IssueSendDialogs';
+import PostPicker from './PostPicker';
 import { ISSUE_STATUS } from './issue-status';
 
 export interface IssueEditorProps {
@@ -49,7 +56,7 @@ export interface IssueEditorProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
-type Busy = '' | 'saving' | 'uploading' | 'testing' | 'syncing' | 'sending' | 'checking' | 'deleting';
+type Busy = '' | 'saving' | 'uploading' | 'testing' | 'syncing' | 'sending' | 'checking' | 'deleting' | 'swapping' | 'skipping';
 
 /** Unsaved edits kept in this browser, tied to the version they were made on. */
 interface Backup {
@@ -132,7 +139,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
   const [conflict, setConflict] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
-  const [dialog, setDialog] = useState<'' | 'test' | 'send'>('');
+  const [dialog, setDialog] = useState<'' | 'test' | 'send' | 'swap'>('');
   const [previewSource, setPreviewSource] = useState<IssueDraftInput | null>(null);
   const heroInput = useRef<HTMLInputElement>(null);
 
@@ -167,7 +174,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
       const usable =
         backup &&
         backup.version === detail.issue.updated_at &&
-        detail.issue.status === 'draft' &&
+        (detail.issue.status === 'draft' || detail.issue.status === 'scheduled') &&
         draftKey(backup.draft) !== draftKey(toDraft(detail.issue));
       if (usable) setOffer(backup);
       else if (backup) writeBackup(id, null);
@@ -180,7 +187,11 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     load();
   }, [load]);
 
-  const readOnly = !issue || issue.status !== 'draft';
+  // A draft is editable; so is a scheduled blog newsletter until its send time (fortnightly spec §5.4).
+  const isBlog = issue?.kind === 'blog';
+  const sendTimePassed = Boolean(issue?.scheduled_for && Date.now() >= Date.parse(issue.scheduled_for));
+  const scheduled = issue?.status === 'scheduled' && !sendTimePassed;
+  const readOnly = !issue || !(issue.status === 'draft' || scheduled);
   const dirty = Boolean(issue && draft && !readOnly && draftKey(draft) !== draftKey(toDraft(issue)));
 
   // Keep unsaved edits in this browser, and warn before they could be lost.
@@ -215,22 +226,37 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     return () => clearTimeout(timer);
   }, [draft]);
   const preview = useMemo(
-    () => (previewSource && issue ? renderPreview({ ...issue, ...previewSource }) : null),
-    [previewSource, issue],
+    () =>
+      previewSource && issue
+        ? renderPreview({ ...issue, ...previewSource }, undefined, {
+            panel: about?.panel ?? null,
+            nextIssueNumber: issue.issue_number ?? about?.next_issue_number ?? null,
+          })
+        : null,
+    [previewSource, issue, about],
   );
   const blockers = useMemo(
     () =>
-      preview && previewSource && about
+      preview && previewSource && about && issue
         ? sendProblems({
-            issue: previewSource,
+            issue: { ...issue, ...previewSource },
             html: preview.sendHtml,
             bytes: preview.bytes,
             subscribed: about.subscribed,
             imagePrefixes: preview.imagePrefixes,
           })
         : [],
-    [preview, previewSource, about],
+    [preview, previewSource, about, issue],
   );
+
+  // Never two newsletters less than 14 days apart (fortnightly spec §5.2).
+  const today = todayInIndia();
+  const gapUntil = about?.next_allowed_date && about.next_allowed_date > today ? about.next_allowed_date : null;
+  const gapMessage = gapUntil ? `The next newsletter can go out on ${formatSlot(sendTimeOn(gapUntil))}.` : '';
+  const skipsAutomatic =
+    about?.next_send_at && todayInIndia(new Date(about.next_send_at)) < addDays(today, MIN_GAP_DAYS)
+      ? `This will skip the automatic newsletter on ${formatSlot(new Date(about.next_send_at))}.`
+      : '';
 
   const update = <K extends keyof IssueDraftInput>(key: K, value: IssueDraftInput[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -252,7 +278,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     } catch (e) {
       if (e instanceof IssueApiError && e.status === 409 && e.issue) {
         // Someone else saved meanwhile: keep this version, so another Save can't overwrite theirs.
-        if (e.issue.status === 'draft') setConflict(true);
+        if (e.issue.status === 'draft' || e.issue.status === 'scheduled') setConflict(true);
         else adopt(e.issue);
       }
       report(e, 'Save failed.');
@@ -355,6 +381,49 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
     }
   }
 
+  function startSwap() {
+    if (!window.confirm("Swap the post? This newsletter's text will be replaced by the new post's.")) return;
+    setDialog('swap');
+  }
+
+  async function runSwap(slug: string) {
+    if (!issue) return;
+    setDialog('');
+    setBusy('swapping');
+    setError('');
+    setNotice('');
+    try {
+      const next = await swapIssuePost(token, issue.id, slug);
+      adopt(next);
+      writeBackup(id, null);
+      setNotice(`Swapped to “${next.title}”.`);
+    } catch (e) {
+      if (e instanceof IssueApiError && e.issue) adopt(e.issue);
+      report(e, "The post wasn't swapped.");
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function runSkip() {
+    if (!issue?.scheduled_for) return;
+    const day = formatSlot(new Date(issue.scheduled_for));
+    if (!window.confirm(`Skip this fortnight? Nothing goes out on ${day}. The post stays first in line for next time.`)) return;
+    setBusy('skipping');
+    setError('');
+    setNotice('');
+    try {
+      adopt(await skipIssue(token, issue.id));
+      writeBackup(id, null);
+      setNotice(`Skipped. Nothing goes out on ${day}.`);
+    } catch (e) {
+      if (e instanceof IssueApiError && e.issue) adopt(e.issue);
+      report(e, "It wasn't skipped.");
+    } finally {
+      setBusy('');
+    }
+  }
+
   async function runDelete() {
     if (!issue || !window.confirm("Delete this draft? This can't be undone.")) return;
     setBusy('deleting');
@@ -440,14 +509,26 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {issue.status === 'draft' && (
+            <button type="button" onClick={runDelete} disabled={working} className={barButton}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
+          {!readOnly && (
+            <button type="button" onClick={() => save()} disabled={!dirty || working} className={barButton}>
+              {busy === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </button>
+          )}
+          {scheduled && (
             <>
-              <button type="button" onClick={runDelete} disabled={working} className={barButton}>
-                <Trash2 className="h-4 w-4" />
-                Delete
+              <button type="button" onClick={startSwap} disabled={working} className={barButton}>
+                {busy === 'swapping' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
+                Swap post
               </button>
-              <button type="button" onClick={() => save()} disabled={!dirty || working} className={barButton}>
-                {busy === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save
+              <button type="button" onClick={runSkip} disabled={working} className={barButton}>
+                {busy === 'skipping' ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
+                Skip this fortnight
               </button>
             </>
           )}
@@ -456,7 +537,12 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
             Send test
           </button>
           {issue.status === 'draft' && (
-            <button type="button" onClick={openSend} disabled={working || blockers.length > 0} className={primaryButton}>
+            <button
+              type="button"
+              onClick={openSend}
+              disabled={working || blockers.length > 0 || Boolean(gapUntil)}
+              className={primaryButton}
+            >
               <Send className="h-4 w-4" />
               Send to subscribers
             </button>
@@ -533,6 +619,26 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
           </button>
         </div>
       )}
+      {issue.status === 'scheduled' && issue.scheduled_for && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          <span className="font-semibold">{`Goes out ${formatSlot(new Date(issue.scheduled_for))}, 10:00 am`}</span>
+          <span>
+            {sendTimePassed
+              ? '· It is being sent now.'
+              : `· to ${about?.subscribed ?? 'every'} subscriber${plural(about?.subscribed ?? null)}. Change the text, swap the post or skip this fortnight until then.`}
+          </span>
+        </div>
+      )}
+      {(issue.status === 'skipped' || issue.status === 'missed' || (issue.status === 'draft' && isBlog)) && issue.reason && (
+        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <span>{issue.reason}</span>
+        </div>
+      )}
+      {issue.status === 'draft' && gapMessage && (
+        <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{gapMessage}</div>
+      )}
       {issue.status === 'draft' && issue.last_error && !error && (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           The last send didn&apos;t go out: {issue.last_error}
@@ -577,17 +683,30 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
               className={field}
             />
           </Field>
-          <Field id="nl-date" label="Date">
+          {!isBlog && (
+            <Field id="nl-date" label="Date">
+              <input
+                id="nl-date"
+                type="date"
+                value={draft.issue_date}
+                disabled={readOnly}
+                onChange={(e) => update('issue_date', e.target.value)}
+                className={field}
+              />
+            </Field>
+          )}
+          <Field id="nl-kicker" label="Kicker" hint="Optional. The short label above the title, such as “A moment for yourself”.">
             <input
-              id="nl-date"
-              type="date"
-              value={draft.issue_date}
+              id="nl-kicker"
+              type="text"
+              value={draft.kicker}
+              maxLength={ISSUE_LIMITS.kicker}
               disabled={readOnly}
-              onChange={(e) => update('issue_date', e.target.value)}
+              onChange={(e) => update('kicker', e.target.value)}
               className={field}
             />
           </Field>
-          <Field id="nl-title" label="Title" hint="Shown in the orange banner over the photo.">
+          <Field id="nl-title" label="Title" hint="The big heading. Text after a colon is set in italic, as in “…: With Yourself”.">
             <textarea
               id="nl-title"
               rows={2}
@@ -646,25 +765,62 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
               </Field>
             </div>
           </div>
-          <div>
-            <p className={labelClass}>Body</p>
-            <BodyEditor key={bodyKey} initial={draft.body} readOnly={readOnly} onChange={onBody} onUploadImage={uploadBodyImage} />
-          </div>
-          <Field
-            id="nl-share"
-            label="Blog link for the Share button"
-            hint="Optional. The Share button sends this link on WhatsApp. Left empty, it's the blog page."
-          >
+          {isBlog ? (
+            <Field id="nl-intro" label="Intro" hint="The paragraph under the photo. It starts as the post's first paragraph.">
+              <textarea
+                id="nl-intro"
+                rows={6}
+                value={draft.intro}
+                maxLength={ISSUE_LIMITS.intro}
+                disabled={readOnly}
+                onChange={(e) => update('intro', e.target.value)}
+                className={field}
+              />
+            </Field>
+          ) : (
+            <div>
+              <p className={labelClass}>Body</p>
+              <BodyEditor key={bodyKey} initial={draft.body} readOnly={readOnly} onChange={onBody} onUploadImage={uploadBodyImage} />
+            </div>
+          )}
+          <Field id="nl-question" label="Question" hint="Optional. Shown in the “A question to take with you” box.">
             <input
-              id="nl-share"
-              type="url"
-              value={draft.share_url ?? ''}
-              placeholder="https://hopetrustindia.com/blogs/"
+              id="nl-question"
+              type="text"
+              value={draft.question}
+              maxLength={ISSUE_LIMITS.question}
               disabled={readOnly}
-              onChange={(e) => update('share_url', e.target.value || null)}
+              onChange={(e) => update('question', e.target.value)}
               className={field}
             />
           </Field>
+          {isBlog ? (
+            draft.share_url && (
+              <p className="text-sm text-gray-600">
+                Read the article goes to{' '}
+                <a href={draft.share_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#ED7428] hover:underline">
+                  the post on the site
+                </a>
+                . To feature another post, use Swap post.
+              </p>
+            )
+          ) : (
+            <Field
+              id="nl-share"
+              label="Article link"
+              hint="Optional. Adds a Read the article button, and the share buttons share it. Left empty, they share the blog page."
+            >
+              <input
+                id="nl-share"
+                type="url"
+                value={draft.share_url ?? ''}
+                placeholder="https://hopetrustindia.com/blogs/…"
+                disabled={readOnly}
+                onChange={(e) => update('share_url', e.target.value || null)}
+                className={field}
+              />
+            </Field>
+          )}
         </div>
         <div className="xl:sticky xl:top-4 xl:self-start">
           {preview ? (
@@ -690,9 +846,13 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
           subscribed={about.subscribed}
           busy={busy === 'saving' || busy === 'syncing' || busy === 'sending'}
           progress={progress}
+          warning={skipsAutomatic}
           onSend={runSend}
           onClose={() => setDialog('')}
         />
+      )}
+      {dialog === 'swap' && (
+        <PostPicker token={token} onUnauthorized={onUnauthorized} onPick={runSwap} onClose={() => setDialog('')} />
       )}
     </div>
   );
