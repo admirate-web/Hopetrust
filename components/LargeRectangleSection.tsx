@@ -102,7 +102,7 @@ export default function LargeRectangleSection() {
                 isHovered ? "text-[#E5F4F4]" : "text-[#00373E]",
               )}
             >
-              A monthly letter from our team, with ideas you can use between sessions.
+              A fortnightly letter from our team, with ideas you can use between sessions.
             </p>
             <div
               onMouseEnter={() => setIsHovered(true)}

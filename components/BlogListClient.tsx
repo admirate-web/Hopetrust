@@ -225,7 +225,7 @@ export default function BlogListClient({
               Stay updated with our latest insights
             </h2>
             <p className="max-w-lg text-xs text-white/60 sm:text-sm">
-              A monthly letter from our team on mental health, therapy and recovery, straight to your inbox.
+              A fortnightly letter from our team on mental health, therapy and recovery, straight to your inbox.
             </p>
             <div className="w-full max-w-2xl text-left">
               <NewsletterForm variant="inline" dark />

@@ -126,7 +126,7 @@ export default function PrivacyPolicyPage() {
                   where and when you agreed instead.
                 </p>
                 <p>
-                  We use these details only to send you the newsletter, about once a month, and to show that you
+                  We use these details only to send you the newsletter, about once a fortnight, and to show that you
                   asked for it. Our email service, Resend, which is based in the United States, sends the
                   newsletter for us and stores your email address for that purpose.
                 </p>

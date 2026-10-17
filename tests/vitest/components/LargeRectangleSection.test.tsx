@@ -16,9 +16,9 @@ vi.mock('next/link', () => ({
 }));
 
 describe('LargeRectangleSection (homepage newsletter card)', () => {
-  it('describes the monthly newsletter and carries the sign-up form', () => {
+  it('describes the fortnightly newsletter and carries the sign-up form', () => {
     render(<LargeRectangleSection />);
-    expect(screen.getByText('A monthly letter from our team, with ideas you can use between sessions.')).toBeInTheDocument();
+    expect(screen.getByText('A fortnightly letter from our team, with ideas you can use between sessions.')).toBeInTheDocument();
     expect(screen.queryByText(/Connect with others, share experiences/)).toBeNull();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
   });

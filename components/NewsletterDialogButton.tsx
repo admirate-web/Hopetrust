@@ -94,7 +94,7 @@ export default function NewsletterDialogButton({ className = '' }: { className?:
                   Subscribe to our newsletter
                 </h2>
                 <p className="mb-5 mt-2 text-sm text-[#00373E]/70">
-                  A monthly letter from our team, with ideas you can use between sessions.
+                  A fortnightly letter from our team, with ideas you can use between sessions.
                 </p>
                 <NewsletterForm variant="card" autoFocus />
               </div>

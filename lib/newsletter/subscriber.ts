@@ -49,7 +49,7 @@ export type AdminSubscriber = Omit<SubscriberRow, 'confirm_token_hash' | 'confir
  */
 export const SIGNUP_NOTICE = {
   version: '2026-10',
-  text: "We'll email you the Hope Trust newsletter about once a month. Unsubscribe any time.",
+  text: "We'll email you the Hope Trust newsletter about once a fortnight. Unsubscribe any time.",
 } as const;
 
 /** Versions the sign-up function accepts; a page opened before a change may still send an older one. */

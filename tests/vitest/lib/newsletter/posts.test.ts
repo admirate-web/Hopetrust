@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { BlogPost } from '@/lib/blog';
+import generated from '@/lib/newsletter/posts.generated.json';
 import {
   DEFAULT_KICKER,
   chooseNextPost,
@@ -147,5 +148,19 @@ describe('chooseNextPost', () => {
     expect(chooseNextPost(posts, ['newest'], [])?.slug).toBe('middle');
     expect(chooseNextPost(posts, [], ['https://x/2.jpg'])?.slug).toBe('middle');
     expect(chooseNextPost(posts, ['newest', 'middle'], ['https://x/1.jpg'])).toBeNull();
+  });
+});
+
+describe('the post index', () => {
+  // A title becomes the email's subject and heading (fortnightly spec §8.1).
+  it('has clean titles: no words run together, and a space after every colon or question mark', () => {
+    const NAMES = /\b(McDonald|iPhone|iPad|YouTube|LinkedIn|WhatsApp)\b/g;
+    const broken = (generated as NewsletterPost[])
+      .map((post) => post.title)
+      .filter((title) => {
+        const text = title.replace(NAMES, '');
+        return /[a-z][A-Z]/.test(text) || /[:?!][A-Za-z]/.test(text) || /\s{2,}/.test(text);
+      });
+    expect(broken).toEqual([]);
   });
 });

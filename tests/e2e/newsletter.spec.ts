@@ -43,7 +43,7 @@ test.describe('Newsletter sign-up', () => {
   test('from the homepage card', async ({ page }) => {
     const bodies = await answerSignups(page);
     await page.goto('/');
-    await page.getByText('A monthly letter from our team, with ideas you can use between sessions.').scrollIntoViewIfNeeded();
+    await page.getByText('A fortnightly letter from our team, with ideas you can use between sessions.').scrollIntoViewIfNeeded();
     await page.getByLabel('Full name').fill('Asha Rao');
     await page.getByLabel('Email address').fill('asha@example.com');
     await page.getByRole('button', { name: 'Subscribe', exact: true }).click();

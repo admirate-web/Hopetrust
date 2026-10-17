@@ -41,7 +41,7 @@ describe('IssuePreview', () => {
     expect(out.html).not.toContain('{{{RESEND_UNSUBSCRIBE_URL}}}');
     expect(out.sendHtml).toContain('{{{RESEND_UNSUBSCRIBE_URL}}}');
     expect(out.bytes).toBe(new TextEncoder().encode(out.sendHtml).length);
-    expect(out.imagePrefixes).toEqual([`${IMAGES}/`]);
+    expect(out.imagePrefixes).toEqual([`${IMAGES}/`, 'https://images.unsplash.com/', 'https://hopetrustindia.com/']);
   });
 });
 

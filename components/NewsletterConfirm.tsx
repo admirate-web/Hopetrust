@@ -70,7 +70,7 @@ export default function NewsletterConfirm() {
       {(state === 'ready' || state === 'confirming') && (
         <>
           <h1 className={heading}>Confirm your subscription</h1>
-          <p className={body}>Click the button to start getting the Hope Trust newsletter, about once a month.</p>
+          <p className={body}>Click the button to start getting the Hope Trust newsletter, about once a fortnight.</p>
           <button type="button" onClick={confirm} disabled={state === 'confirming'} className={button}>
             {state === 'confirming' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             Confirm my subscription

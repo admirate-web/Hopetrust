@@ -32,7 +32,7 @@ export function buildConfirmEmail({ confirmUrl, logoUrl }: ConfirmEmailInput): {
 <tr><td align="center" style="padding:32px 32px 8px 32px;"><img src="${esc(logoUrl)}" width="80" height="81" alt="Hope Trust" style="display:block;border:0;width:80px;height:auto;"></td></tr>
 <tr><td style="padding:8px 32px 0 32px;font-family:${FONT};color:${COLORS.text};">
 <h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;font-weight:600;text-align:center;">Please confirm your subscription</h1>
-<p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">Thank you for signing up for the Hope Trust newsletter. Click the button below to confirm your email address. We'll send you the newsletter about once a month.</p>
+<p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">Thank you for signing up for the Hope Trust newsletter. Click the button below to confirm your email address. We'll send you the newsletter about once a fortnight.</p>
 </td></tr>
 <tr><td align="center" style="padding:0 32px 24px 32px;">
 <a href="${url}" style="display:inline-block;background-color:${COLORS.orange};color:${COLORS.white};font-family:${FONT};font-size:16px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:999px;">Confirm my subscription</a>
