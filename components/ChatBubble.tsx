@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { MessageCircle, X, ArrowUp, ArrowUpRight } from 'lucide-react';
-import { getLogoUrl } from '@/lib/assets';
 import { siteConfig } from '@/lib/config';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
@@ -194,10 +193,10 @@ function Bubble() {
                 className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-[radial-gradient(115%_100%_at_50%_100%,rgba(237,116,40,0.34),rgba(237,116,40,0)_72%)]"
               />
               <div className="relative flex items-center gap-3 px-4 py-3.5">
-                {/* The mark is served from storage, so it can be slow or absent.
-                    The monogram sits underneath rather than behind a state flag:
-                    an unpainted image reveals it, and a blank white disc never
-                    shows. */}
+                {/* The mark can still be slow on a first visit or a poor
+                    connection. The monogram sits underneath rather than behind a
+                    state flag: an unpainted image reveals it, and a blank white
+                    disc never shows. */}
                 <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-white/25">
                   <span
                     aria-hidden="true"
@@ -207,7 +206,7 @@ function Bubble() {
                   </span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={getLogoUrl()}
+                    src="/images/brand/hope-trust-logo.webp"
                     alt=""
                     width={36}
                     height={36}

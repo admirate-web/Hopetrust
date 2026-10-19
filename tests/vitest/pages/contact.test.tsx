@@ -30,10 +30,6 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
-vi.mock('@/lib/assets', () => ({
-  getAssetUrl: (path: string) => `/mock/${path}`,
-}));
-
 const mockInsert = vi.fn();
 vi.mock('@/lib/supabase', () => ({
   supabase: {

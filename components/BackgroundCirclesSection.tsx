@@ -5,7 +5,6 @@ import { Bricolage_Grotesque } from 'next/font/google';
 import VariableProximity from './VariableProximity';
 import { useScrollAnimation, fadeInUp } from '@/hooks/useScrollAnimation';
 import { useRef } from 'react';
-import { getAssetUrl } from '@/lib/assets';
 import LazyVideo from './LazyVideo';
 
 const bricolage = Bricolage_Grotesque({
@@ -101,7 +100,7 @@ const BackgroundCirclesSection = () => {
             <div className="relative w-full max-w-[479px] aspect-[479/491] rounded-[52px] bg-[#F97316] shadow-[0_24px_60px_rgba(0,0,0,0.2)] overflow-hidden">
               <LazyVideo
                 className="h-full w-full object-cover"
-                src={getAssetUrl('landing page.mp4')}
+                src="/videos/home-intro.mp4"
               />
             </div>
           </div>

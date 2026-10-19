@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { Bricolage_Grotesque } from 'next/font/google';
 import Header from '@/components/Header';
 import FadeInSection from '@/components/FadeInSection';
-import { getAssetUrl } from '@/lib/assets';
 import dynamic from 'next/dynamic';
 import FaqSection from '@/components/FaqSection';
 import { interventionFaqs } from '@/lib/faqs';
@@ -49,7 +48,7 @@ export default function InterventionServicesPage() {
           {/* Background image with parallax */}
           <motion.div style={{ y: backgroundY }} className="absolute inset-0 h-[120%] w-full">
             <Image
-              src={getAssetUrl('intervensionservices_newheroimage.png')}
+              src="/images/services/intervention-hero.webp"
               alt="Lush botanical background with pine and yellow flowers"
               fill
               className="object-cover"
@@ -83,7 +82,8 @@ export default function InterventionServicesPage() {
             loop
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
-            src={getAssetUrl('348932.mp4')}
+            src="/videos/gradient-background.mp4"
+            poster="/images/posters/gradient-background.webp"
           />
           <FadeInSection>
             <div className="relative z-10 mx-auto max-w-[1226px] px-6 sm:px-10 text-center">
@@ -166,7 +166,7 @@ export default function InterventionServicesPage() {
             <FadeInSection delay={150}>
               <div className="w-full overflow-hidden rounded-[24px]">
                 <Image
-                  src={getAssetUrl('intervention services_2.png')}
+                  src="/images/services/intervention-support.webp"
                   alt="Support during addiction intervention"
                   width={860}
                   height={480}

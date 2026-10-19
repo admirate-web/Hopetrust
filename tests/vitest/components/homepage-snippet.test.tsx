@@ -5,10 +5,6 @@ vi.mock('next/font/google', () => ({
   Bricolage_Grotesque: () => ({ className: 'mock-font' }),
 }));
 
-vi.mock('@/lib/assets', () => ({
-  getAssetUrl: (path: string) => `/mock/${path}`,
-}));
-
 import BackgroundCirclesSection from '@/components/BackgroundCirclesSection';
 import ClientsSayingSection from '@/components/ClientsSayingSection';
 

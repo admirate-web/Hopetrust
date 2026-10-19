@@ -29,6 +29,15 @@
         ],
         "createdAt": "2026-10-13T17:58:19.977Z",
         "reason": "Email-client fallback: Outlook and Gmail ignore web fonts, so spec 6.1 names Arial/Helvetica as the newsletter's fallback"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "tests/vitest/pages/site-media.test.tsx"
+        ],
+        "createdAt": "2026-10-19T05:56:19.671Z",
+        "reason": "Claude: next/image test double spreads the caller's props, so src arrives via {...rest}; test file, never rendered on the site"
       }
     ]
   }

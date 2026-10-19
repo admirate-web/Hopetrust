@@ -155,9 +155,10 @@ export default function PrivacyPolicyPage() {
             muted
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
+            poster="/images/posters/gradient-background.webp"
           >
             <source
-              src="https://mjgbotzrjmwggzwkoovi.supabase.co/storage/v1/object/public/hopetrust%20assets/348932.mp4"
+              src="/videos/gradient-background.mp4"
               type="video/mp4"
             />
           </video>
