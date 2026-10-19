@@ -3,7 +3,6 @@ import { render } from '@testing-library/react';
 import PrivacyPolicyPage from '@/app/privacy-policy/page';
 
 vi.mock('next/font/google', () => ({ Bricolage_Grotesque: () => ({ className: 'mock-font' }) }));
-vi.mock('@/lib/assets', () => ({ getAssetUrl: (path: string) => `/mock/${path}` }));
 vi.mock('next/link', () => ({
   default: ({ children, href, ...props }: { children: React.ReactNode; href: string } & Record<string, unknown>) => (
     <a href={href} {...props}>{children}</a>

@@ -16,10 +16,6 @@ vi.mock('next/font/google', () => ({
   Bricolage_Grotesque: () => ({ className: 'mock-font' }),
 }));
 
-vi.mock('@/lib/assets', () => ({
-  getAssetUrl: (path: string) => `/mock/${path}`,
-}));
-
 import ErrorPage from '@/app/error';
 
 describe('ErrorPage', () => {

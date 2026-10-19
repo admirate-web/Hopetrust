@@ -1,25 +1,22 @@
 "use client";
 
 import { Bricolage_Grotesque } from "next/font/google";
-import { getStorageUrl } from '@/lib/assets';
 
 const headingFont = Bricolage_Grotesque({
   subsets: ["latin"],
   weight: ["600"],
 });
 
-const AFFIL_BUCKET = 'affiliations%20logo';
-
 const logos = [
-  getStorageUrl(AFFIL_BUCKET, 'image 45.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 46.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 47.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 48.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 49.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 50.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 51.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 52.png'),
-  getStorageUrl(AFFIL_BUCKET, 'image 53.png'),
+  '/images/affiliations/affiliation-1.webp',
+  '/images/affiliations/affiliation-2.webp',
+  '/images/affiliations/affiliation-3.webp',
+  '/images/affiliations/affiliation-4.webp',
+  '/images/affiliations/affiliation-5.webp',
+  '/images/affiliations/affiliation-6.webp',
+  '/images/affiliations/affiliation-7.webp',
+  '/images/affiliations/affiliation-8.webp',
+  '/images/affiliations/affiliation-9.webp',
 ];
 
 export default function AffiliationsSection() {

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Bricolage_Grotesque } from "next/font/google";
-import { getAssetUrl } from '@/lib/assets';
 import LazyVideo from './LazyVideo';
 
 const bricolage = Bricolage_Grotesque({
@@ -53,7 +52,7 @@ export default function RectangleSection() {
         {/* Background video */}
         <LazyVideo
           className="absolute inset-0 h-full w-full object-cover"
-          src={getAssetUrl("Sun shine.mp4")}
+          src="/videos/sunshine.mp4"
         />
 
         {/* Overlay content */}
@@ -99,7 +98,7 @@ export default function RectangleSection() {
             <div className="flex flex-1 items-center justify-end">
               <div className="h-[180px] w-[120px] sm:h-[200px] sm:w-[150px] lg:h-[286px] lg:w-[214px] overflow-hidden rounded-[20px] sm:rounded-[24px] lg:rounded-[32px]">
                 <LazyVideo
-                  src={getAssetUrl("FINal.mp4")}
+                  src="/videos/home-portrait-loop.mp4"
                   className="h-full w-full scale-[1.08] transform object-cover"
                 />
               </div>

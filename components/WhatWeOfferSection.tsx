@@ -5,7 +5,6 @@ import Image from "next/image";
 import { motion } from "motion/react";
 import { Bricolage_Grotesque } from "next/font/google";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { getAssetUrl } from '@/lib/assets';
 
 const headingFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -13,11 +12,11 @@ const headingFont = Bricolage_Grotesque({
 });
 
 const items = [
-  { label: "Therapy", icon: getAssetUrl("asset4.png"), href: "/mental-health/" },
-  { label: "Addiction Care", icon: getAssetUrl("asset1.png"), href: "/addiction/" },
-  { label: "Psychiatry", icon: getAssetUrl("asset2.png"), href: "/mental-health/" },
-  { label: "Relationships", icon: getAssetUrl("asset3.png"), href: "/couples-counselling/" },
-  { label: "Queer Affirmative Care", icon: getAssetUrl("asset5.png"), href: "/mental-health/" },
+  { label: "Therapy", icon: "/images/home/offer-therapy.webp", href: "/mental-health/" },
+  { label: "Addiction Care", icon: "/images/home/offer-addiction-care.webp", href: "/addiction/" },
+  { label: "Psychiatry", icon: "/images/home/offer-psychiatry.webp", href: "/mental-health/" },
+  { label: "Relationships", icon: "/images/home/offer-relationships.webp", href: "/couples-counselling/" },
+  { label: "Queer Affirmative Care", icon: "/images/home/offer-queer-affirmative-care.webp", href: "/mental-health/" },
 ];
 
 export default function WhatWeOfferSection() {

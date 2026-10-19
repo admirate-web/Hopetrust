@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Bricolage_Grotesque } from "next/font/google";
-import { getAssetUrl } from "@/lib/assets";
 import NewsletterDialogButton from "@/components/NewsletterDialogButton";
 
 const headingFont = Bricolage_Grotesque({
@@ -60,7 +59,7 @@ export default function Footer() {
               {/* Logo */}
               <div className="shrink-0">
                 <img
-                  src={getAssetUrl("logo1.png")}
+                  src="/images/brand/hope-trust-logo.webp"
                   alt="Hope Trust"
                   className="h-16 sm:h-20 w-auto"
                 />

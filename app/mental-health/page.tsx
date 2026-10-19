@@ -7,7 +7,6 @@ import { Bricolage_Grotesque } from 'next/font/google';
 import Header from '@/components/Header';
 import FadeInSection from '@/components/FadeInSection';
 import dynamic from 'next/dynamic';
-import { getAssetUrl } from '@/lib/assets';
 import FaqSection from '@/components/FaqSection';
 import { mentalHealthFaqs } from '@/lib/faqs';
 
@@ -55,7 +54,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     issues:
       'Anxiety, Depression, Stress, Anger Management, ADHD, Bipolar Disorder, Schizophrenia',
     cardBg: '#F9E6D0',
-    imageSrc: getAssetUrl('mental health therapy.png'),
+    imageSrc: '/images/services/mental-health-therapy.webp',
     imageAlt: 'Therapy illustration',
     more: { label: 'Find a therapist', href: '/book-your-session/' },
   },
@@ -68,7 +67,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     issues:
       'Anxiety, Depression, Stress, Anger Management, Loneliness, Procrastination, Grief, Trauma, Interpersonal Challenges',
     cardBg: '#F8F1BC',
-    imageSrc: getAssetUrl('medications.png'),
+    imageSrc: '/images/services/mental-health-medications.webp',
     imageAlt: 'Medications illustration',
   },
   couples: {
@@ -82,7 +81,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     issues:
       'Communication, Conflict Resolution, Trust Building, Empathy',
     cardBg: '#EDE6B1',
-    imageSrc: getAssetUrl('couple therapy.png'),
+    imageSrc: '/images/services/mental-health-couples.webp',
     imageAlt: 'Couples therapy illustration',
     more: { label: 'Couples & marriage counselling', href: '/couples-counselling/' },
   },
@@ -96,7 +95,7 @@ const FOCUS_SECTIONS: Record<FocusKey, FocusConfig> = {
     issues:
       <>Family Conflicts, Boundaries, Generational Gaps,<br />Parent–Child Communication</>,
     cardBg: '#DFD58F',
-    imageSrc: getAssetUrl('family therapy.png'),
+    imageSrc: '/images/services/mental-health-family.webp',
     imageAlt: 'Family therapy illustration',
   },
 };
@@ -141,7 +140,7 @@ const bricolage = Bricolage_Grotesque({
 
 const CAROUSEL_SLIDES = [
   {
-    image: getAssetUrl('mental_health_carousel.png'),
+    image: '/images/services/mental-health-carousel-1.webp',
     alt: "Addiction and overlapping concerns",
     title: "Addiction and overlapping concerns",
     paragraphs: [
@@ -150,7 +149,7 @@ const CAROUSEL_SLIDES = [
     bold: "This can include gambling, internet use, gaming, shopping, food-related issues, compulsive work, exercise, and other repeated behaviors that begin to cause harm.",
   },
   {
-    image: getAssetUrl('mental_health_carousel_2.png'),
+    image: '/images/services/mental-health-carousel-2.webp',
     alt: "Couples and relationship support",
     title: "Couples and relationship support",
     paragraphs: [
@@ -160,7 +159,7 @@ const CAROUSEL_SLIDES = [
     bold: "",
   },
   {
-    image: getAssetUrl('mental_health_carousel_3.png'),
+    image: '/images/services/mental-health-carousel-3.webp',
     alt: "LGBTQIA+ affirmative care",
     title: "LGBTQIA+ affirmative care",
     paragraphs: [
@@ -390,7 +389,7 @@ export default function MentalHealthPage() {
 
         {/* Support banner with video background — lazy-loaded */}
         <section className="relative w-full overflow-hidden py-8 sm:py-10 bg-[#00373E]">
-          <LazyVideo src={getAssetUrl('348932.mp4')} className="absolute inset-0 h-full w-full object-cover" />
+          <LazyVideo src="/videos/gradient-background.mp4" className="absolute inset-0 h-full w-full object-cover" />
           <motion.div
             {...fadeFrom('up')}
             className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-8"
@@ -409,7 +408,7 @@ export default function MentalHealthPage() {
             {/* Left: image */}
             <motion.div {...fadeFrom('left')} className="w-full md:w-1/2 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-lg">
               <Image
-                src={getAssetUrl('mental_health_new.png')}
+                src="/images/services/mental-health-session.webp"
                 alt="Therapist working with client"
                 width={560}
                 height={480}

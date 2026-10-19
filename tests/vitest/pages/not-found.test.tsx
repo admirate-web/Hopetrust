@@ -11,10 +11,6 @@ vi.mock('next/font/google', () => ({
   Bricolage_Grotesque: () => ({ className: 'mock-font' }),
 }));
 
-vi.mock('@/lib/assets', () => ({
-  getAssetUrl: (path: string) => `/mock/${path}`,
-}));
-
 import NotFound from '@/app/not-found';
 
 describe('NotFound Page', () => {

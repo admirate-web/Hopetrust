@@ -8,7 +8,6 @@ import { Bricolage_Grotesque, Roboto_Flex } from "next/font/google";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { cn } from "@/lib/utils";
 import VariableProximity from "./VariableProximity";
-import { getAssetUrl } from '@/lib/assets';
 import NewsletterForm from './NewsletterForm';
 
 const robotoFlex = Roboto_Flex({
@@ -42,7 +41,7 @@ export default function LargeRectangleSection() {
       >
         {/* Background illustration */}
         <Image
-          src={getAssetUrl("Group 22.png")}
+          src="/images/home/community-background.webp"
           alt="Community background illustration"
           fill
           className="object-cover"

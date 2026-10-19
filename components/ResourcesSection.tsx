@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 import { Bricolage_Grotesque } from "next/font/google";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { InteractiveHoverButton } from "@/components/InteractiveHoverButton";
-import { getAssetUrl } from '@/lib/assets';
 
 const headingFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -48,7 +47,7 @@ export default function ResourcesSection() {
         {/* Decorative orange icon behind heading */}
         <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-0">
           <img
-            src={getAssetUrl('orange Icon.png')}
+            src="/images/home/resources-icon.webp"
             alt=""
             className="h-56 w-56 sm:h-72 sm:w-72 object-contain opacity-90"
           />

@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { Bricolage_Grotesque } from 'next/font/google';
 import Header from '@/components/Header';
 import { siteConfig } from '@/lib/config';
-import { getAssetUrl } from '@/lib/assets';
 import dynamic from 'next/dynamic';
 import FaqSection from '@/components/FaqSection';
 import { corporateFaqs } from '@/lib/faqs';
@@ -95,7 +94,7 @@ export default function CorporateWellnessPage() {
           {/* Background image with parallax */}
           <motion.div style={{ y: backgroundY }} className="absolute inset-0 h-[120%] w-full">
             <Image
-              src={getAssetUrl('corporatewelness.png')}
+              src="/images/services/corporate-wellness-hero.webp"
               alt="Countryside at sunset representing workplace wellness"
               fill
               className="object-cover"
@@ -223,7 +222,8 @@ export default function CorporateWellnessPage() {
             loop
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
-            src={getAssetUrl('348932.mp4')}
+            src="/videos/gradient-background.mp4"
+            poster="/images/posters/gradient-background.webp"
           />
           <div className="relative z-10 mx-auto max-w-[1100px] px-6 sm:px-10">
             <motion.div

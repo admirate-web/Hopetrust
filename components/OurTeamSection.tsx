@@ -4,7 +4,6 @@ import * as React from 'react';
 import { Bricolage_Grotesque } from 'next/font/google';
 
 import { cn } from '@/lib/utils';
-import { getAssetUrl } from '@/lib/assets';
 
 type TeamCategory = {
   value: 'therapists' | 'Social Work' | 'counsellors' | 'psychologists' | 'Psychiatry';
@@ -75,8 +74,9 @@ export default function OurTeamSection({
         playsInline
         className="absolute inset-0 h-full w-full object-cover"
         preload="metadata"
+        poster="/images/posters/gradient-background.webp"
       >
-        <source src={getAssetUrl('348932.mp4')} type="video/mp4" />
+        <source src="/videos/gradient-background.mp4" type="video/mp4" />
       </video>
 
       {/* Content */}

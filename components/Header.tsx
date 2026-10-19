@@ -6,7 +6,6 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Bricolage_Grotesque } from "next/font/google";
-import { getAssetUrl } from '@/lib/assets';
 
 const navFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -207,7 +206,7 @@ export default function Header() {
             <div className="flex items-center">
               <Link href="/" className="relative flex-shrink-0">
                 <Image
-                  src={getAssetUrl("logo1.png")}
+                  src="/images/brand/hope-trust-logo.webp"
                   alt="Hope Trust Logo"
                   width={120}
                   height={120}
@@ -253,7 +252,7 @@ export default function Header() {
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <Link href="/" onClick={() => setIsMenuOpen(false)}>
             <Image
-              src={getAssetUrl('logo1.png')}
+              src="/images/brand/hope-trust-logo.webp"
               alt="Hope Trust Logo"
               width={96}
               height={96}

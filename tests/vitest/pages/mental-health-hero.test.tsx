@@ -2,13 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from '@testing-library/react';
+import { boxes } from './mp4';
 
 vi.mock('next/font/google', () => ({
   Bricolage_Grotesque: () => ({ className: 'mock-font' }),
-}));
-
-vi.mock('@/lib/assets', () => ({
-  getAssetUrl: (path: string) => `/mock/${path}`,
 }));
 
 vi.mock('next/link', () => ({
@@ -28,19 +25,6 @@ import MentalHealthPage from '@/app/mental-health/page';
 // at the end of the file, behind a poster that was a line drawing of a face.
 // Visitors saw a blank screen, then the drawing with white text on white, and
 // only seconds later the video.
-
-/** Top-level MP4 box types, in file order. */
-function boxes(file: Buffer): string[] {
-  const types: string[] = [];
-  for (let at = 0; at + 8 <= file.length; ) {
-    let size = file.readUInt32BE(at);
-    if (size === 1) size = Number(file.readBigUInt64BE(at + 8));
-    types.push(file.toString('latin1', at + 4, at + 8));
-    if (size < 8) break;
-    at += size;
-  }
-  return types;
-}
 
 function heroVideo() {
   const { container } = render(<MentalHealthPage />);

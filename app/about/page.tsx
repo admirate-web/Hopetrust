@@ -8,7 +8,6 @@ import { motion } from 'motion/react';
 import { Bricolage_Grotesque } from 'next/font/google';
 import ProximityText from '@/components/ProximityText';
 import OurTeamSection from '@/components/OurTeamSection';
-import { getAssetUrl } from '@/lib/assets';
 import FadeInSection from '@/components/FadeInSection';
 
 // Re-use CTA via code-split chunk
@@ -119,7 +118,7 @@ export default function About() {
               >
                 <div className="relative w-full max-w-2xl lg:max-w-3xl aspect-square">
                   <Image
-                    src={getAssetUrl("about us new.png")}
+                    src="/images/about/therapist.webp"
                     alt="Hope Trust therapist"
                     fill
                     className="object-contain"
@@ -164,7 +163,7 @@ export default function About() {
                 transition={{ duration: 0.6, ease: [0.22, 0.61, 0.36, 1] }}
               >
                 <Image
-                  src={getAssetUrl('aboutus_new_image_!.png')}
+                  src="/images/about/story.webp"
                   alt="Hope Trust story"
                   width={560}
                   height={400}
@@ -216,7 +215,7 @@ export default function About() {
                 transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.61, 0.36, 1] }}
               >
                 <Image
-                  src={getAssetUrl('aboutus_new_image_2.png')}
+                  src="/images/about/community.webp"
                   alt="Hope Trust community"
                   width={560}
                   height={400}
@@ -260,7 +259,7 @@ export default function About() {
                 transition={{ duration: 0.6, ease: [0.22, 0.61, 0.36, 1] }}
               >
                 <Image
-                  src={getAssetUrl("Asset 15.png")}
+                  src="/images/about/icon-listener.webp"
                   alt="Listener icon"
                   width={96}
                   height={96}
@@ -293,7 +292,7 @@ export default function About() {
                 }}
               >
                 <Image
-                  src={getAssetUrl("Asset 14.png")}
+                  src="/images/about/icon-guidance.webp"
                   alt="Guidance icon"
                   width={96}
                   height={96}
@@ -326,7 +325,7 @@ export default function About() {
                 }}
               >
                 <Image
-                  src={getAssetUrl("Asset 13.png")}
+                  src="/images/about/icon-process.webp"
                   alt="Process icon"
                   width={96}
                   height={96}
@@ -390,7 +389,7 @@ export default function About() {
                     }}
                   >
                     <Image
-                      src={getAssetUrl("Frame 5.png")}
+                      src="/images/about/wellness-coaching.webp"
                       alt="Wellness coaching illustration"
                       fill
                       className="object-contain md:object-cover md:object-right"
@@ -449,7 +448,7 @@ export default function About() {
                   Select the therapist you feel right with.
                 </p>
                 <Image
-                  src={getAssetUrl("Asset 12.png")}
+                  src="/images/about/icon-booking.webp"
                   alt="Booking via WhatsApp or website"
                   width={80}
                   height={80}
@@ -482,7 +481,7 @@ export default function About() {
                   that works for you.
                 </p>
                 <Image
-                  src={getAssetUrl("Asset 11.png")}
+                  src="/images/about/icon-date-time.webp"
                   alt="Pick a date and time"
                   width={80}
                   height={80}
@@ -519,7 +518,7 @@ export default function About() {
                   for your session.
                 </p>
                 <Image
-                  src={getAssetUrl("Asset 10.png")}
+                  src="/images/about/icon-session.webp"
                   alt="Online or in-person session"
                   width={80}
                   height={80}

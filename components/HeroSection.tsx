@@ -3,7 +3,6 @@
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
 import { Bricolage_Grotesque } from "next/font/google";
-import { getAssetUrl } from '@/lib/assets';
 
 const heroFont = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -29,7 +28,9 @@ const HeroSection = () => {
       ref={containerRef}
       className="relative min-h-screen w-full overflow-hidden"
     >
-      {/* Background gradient video with parallax */}
+      {/* Background gradient video with parallax. Served from this site at
+          720p (945 KB; it was a 14 MB 4K file from Supabase storage), with its
+          own first frame as the poster. */}
       <motion.video
         style={{ y: backgroundY }}
         autoPlay
@@ -38,8 +39,9 @@ const HeroSection = () => {
         playsInline
         className="absolute inset-0 h-full w-full object-cover"
         preload="metadata"
+        poster="/images/posters/gradient-background.webp"
       >
-        <source src={getAssetUrl("348932.mp4")} type="video/mp4" />
+        <source src="/videos/gradient-background.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </motion.video>
 
@@ -62,7 +64,8 @@ const HeroSection = () => {
 
           {/* Main rounded hero card */}
           <div className="relative h-full w-full overflow-hidden rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] border border-white/70 bg-black/60 backdrop-blur-md shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
-            {/* Inner hero video */}
+            {/* Inner hero video: 720p at 30 fps (1.7 MB). It was 20 MB at
+                1080p/60 fps, mostly hidden under the 70% overlay below. */}
             <div className="absolute inset-0">
               <video
                 autoPlay
@@ -71,8 +74,9 @@ const HeroSection = () => {
                 playsInline
                 className="h-full w-full object-cover"
                 preload="metadata"
+                poster="/images/posters/home-hero.webp"
               >
-                <source src={getAssetUrl("final hero video.mp4")} type="video/mp4" />
+                <source src="/videos/home-hero.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
               <div className="absolute inset-0 bg-black/70" />
