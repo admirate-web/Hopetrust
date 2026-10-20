@@ -258,6 +258,92 @@
   to = "/mental-health/"
   status = 301
 
+# More WordPress pages, from Search Console's 16-month page report. They stopped
+# drawing impressions when the WordPress site was replaced in May–June 2026, so
+# the 90-day report behind the rules above never showed them. Google has since
+# dropped them, but a 301 still passes on whatever links point at them.
+# /adhd-clinic/ ranked 6–9 for "adhd diagnosis hyderabad", "adhd treatment in
+# hyderabad" and "adult adhd diagnosis hyderabad" (23,400 impressions). Pages
+# with no counterpart here (/support-circles/, /gallery/, /faqs/, /shop/) keep
+# their 404: Google treats a redirect to an unrelated page as a soft 404.
+
+[[redirects]]
+  from = "/adhd-clinic"
+  to = "/mental-health/"
+  status = 301
+
+[[redirects]]
+  from = "/corporate-wellness-csr"
+  to = "/corporate-wellness/"
+  status = 301
+
+[[redirects]]
+  from = "/online-counselling-therapists"
+  to = "/online-therapy/"
+  status = 301
+
+[[redirects]]
+  from = "/specialised-addiction-services"
+  to = "/addiction/"
+  status = 301
+
+# Searched as "hope trust … reviews"; the testimonials are on the home page now.
+[[redirects]]
+  from = "/testimonials"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/terms-conditions"
+  to = "/terms-and-conditions/"
+  status = 301
+
+# The old practitioner lists.
+[[redirects]]
+  from = "/psychiatrists-therapist"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/psychologists"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/psychiatrists"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/counselling-therapists"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/therapist-list-2"
+  to = "/book-your-session/"
+  status = 301
+
+[[redirects]]
+  from = "/assessments/for-children-and-adolescents"
+  to = "/child-psychologist/"
+  status = 301
+
+[[redirects]]
+  from = "/assessments/*"
+  to = "/mental-health/"
+  status = 301
+
+[[redirects]]
+  from = "/assessments"
+  to = "/mental-health/"
+  status = 301
+
+[[redirects]]
+  from = "/uncategorized/burnout-and-stress-the-new-epidemic"
+  to = "/blogs/burnout-and-stress-the-new-epidemic/"
+  status = 301
+
 # Misspelt links to real posts. Search Console shows Google requesting these —
 # mostly from other sites and AI answers quoting a slug from memory. Sending
 # them to the post keeps whatever link value they carry instead of a 404.
@@ -480,6 +566,114 @@
 [[redirects]]
   from = "/blogs/30-questions-to-get-someone-talking-more-than-how-@are-you"
   to = "/blogs/30-questions-to-get-someone-talking-more-than-how-are-you/"
+  status = 301
+
+# Old post URLs whose post now has a different slug. The /blog/:slug rule below
+# would forward them to a /blogs/ URL that doesn't exist: Search Console listed
+# them under "Page with redirect" while Google followed the 301 into a 404.
+# Found by tracing every /blog/ URL in Search Console's 16-month page report and
+# in the Wayback Machine's index of the old site. Two old posts have nothing
+# equivalent here (advantages-of-physical-therapy-rehabilitation,
+# pet-assisted-therapy) and still end on the 404.
+
+[[redirects]]
+  from = "/blog/rehabilitation-for-drug-abuse"
+  to = "/blogs/what-does-rehabilitation-mean-for-addictions/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-people-drink-alcohol"
+  to = "/blogs/5-common-reasons-why-people-drink/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-people-drink-alcohol-2-11-2023"
+  to = "/blogs/5-common-reasons-why-people-drink/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-do-people-drink-alcohol"
+  to = "/blogs/5-common-reasons-why-people-drink/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/everything-you-need-to-know-about-depression"
+  to = "/blogs/everything-you-should-know-about-depression/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/gambling-addiction-treatment-in-india"
+  to = "/blogs/gambling-addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/gambling-addiction-helpline-india"
+  to = "/blogs/gambling-addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/gambling-addiction-in-india-treatment"
+  to = "/blogs/gambling-addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/gambling-addiction-in-india"
+  to = "/blogs/gambling-addiction/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/i-think-im-in-love-but-am-i-hopetrustindia-com-4806387"
+  to = "/blogs/i-think-im-in-love-but-am-i/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/iq-doesnt-equal-success-focus-on-your-eq"
+  to = "/blogs/a-high-iq-doesnt-equal-success-focus-on-your-eq/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/being-silent-can-make-you-more-powerful-successful-and-charismatic-558840035000"
+  to = "/blogs/be-quiet5-unknown-benefits-of-being-silent/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-some-people-talk-too-muchand-how-to-manage-them"
+  to = "/blogs/why-do-some-people-talk-too-muchand-how-to-manage-them/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-do-some-people-talk-too-much-and-how-to-manage-them"
+  to = "/blogs/why-do-some-people-talk-too-muchand-how-to-manage-them/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/crystal-meth-addiction-treatment-and-rehabilitation-process"
+  to = "/blogs/crystal-meth-addiction-treatment/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/forget-the-butterflies-why-real-love-feels-like-home-12997207"
+  to = "/blogs/forget-the-butterflies-why-real-love-feels-like-coming-home/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/top-10-reasons-for-divorce-in-india"
+  to = "/blogs/top-10-reasons-for-divorce/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/addiction-how-family-suffers-and-what-it-can-do"
+  to = "/blogs/addiction-how-the-family-suffers-and-what-it-can-do/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/helping-addicts"
+  to = "/blogs/strategies-for-helping-addicts-and-alcoholics-to-get-the-help-they-need/"
+  status = 301
+
+[[redirects]]
+  from = "/blog/why-emotional-wellness-is-important-for-you-2"
+  to = "/blogs/why-emotional-wellness-is-important-for-you/"
   status = 301
 
 # Redirect old WordPress blog URLs (/blog/slug/) to new format (/blogs/slug/)
