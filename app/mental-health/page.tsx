@@ -431,7 +431,7 @@ export default function MentalHealthPage() {
               </p>
               <div>
                 <a
-                  href="/book-your-session"
+                  href="/book-your-session/"
                   className="inline-flex items-center justify-center rounded-full bg-[#ED7428] px-6 sm:px-8 py-2.5 text-sm sm:text-base font-semibold text-white shadow-md hover:bg-[#d4651f] transition-all duration-200 active:scale-95"
                 >
                   Find a Therapist
@@ -593,7 +593,7 @@ export default function MentalHealthPage() {
               Take the first step towards support and healing.
             </p>
             <a
-              href="/book-your-session"
+              href="/book-your-session/"
               className="mt-2 inline-flex items-center justify-center rounded-full bg-[#ED7428] px-6 sm:px-8 py-2.5 text-sm sm:text-base font-semibold text-white shadow-md hover:bg-[#d4651f] transition-all duration-200 active:scale-95"
             >
               Book an appointment

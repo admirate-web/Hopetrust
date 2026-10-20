@@ -77,7 +77,7 @@ export default function WhatWeOfferSection() {
         </p>
 
         <a
-          href="/book-your-session"
+          href="/book-your-session/"
           className="mt-4 inline-flex items-center justify-center rounded-full bg-[#ED7428] px-8 sm:px-10 py-3 text-sm sm:text-base font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#d4631f] hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-[0.97]"
         >
           Book an appointment

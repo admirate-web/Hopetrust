@@ -118,7 +118,7 @@ const HeroSection = () => {
 
               {/* Button */}
               <a
-                href="/book-your-session"
+                href="/book-your-session/"
                 className="mt-4 inline-flex items-center justify-center 
   w-full sm:w-auto 
   rounded-full bg-[#00343A] 
