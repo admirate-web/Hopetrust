@@ -8,64 +8,51 @@ import { siteConfig } from '@/lib/config';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
 /**
- * The website chat bubble. Every decision about what to say is made by the CRM
- * engine behind /api/chat — this renders the turn and carries the state.
+ * The website chat bubble: the Hope Trust AI Assistant. Every decision about
+ * what to say is made by the assistant behind /api/chat — this renders each
+ * turn and sends the conversation so far along with the next message.
  *
- * It holds no conversation of its own: the message list lives in component
- * state and dies with the tab, and only the four-field state object is
- * persisted. Nothing a person types is ever written down here.
+ * It persists nothing. The message list lives in component state and dies with
+ * the tab, and nothing goes into sessionStorage or localStorage: someone on a
+ * shared computer asking about addiction treatment must not leave the
+ * conversation for whoever sits down next.
  */
-
-const STATE_KEY = 'ht_chat_state';
 
 const FAILURE_LINE =
   "I can't reach our team just now. You can message us on WhatsApp instead — someone will pick it up.";
 
+// The assistant follows the conversation from its last few messages, and the
+// proxy forwards no more than this many.
+const MAX_HISTORY_ENTRIES = 6;
+
 interface ChatLink {
   label: string;
   url: string;
+  kind?: 'blog' | 'page';
 }
 
-interface ChatState {
-  step: string;
-  first_name: string | null;
-  age: number | null;
-  focus_tags: string[];
+interface Therapist {
+  name: string;
+  line: string;
+  photo: string;
+  url: string;
 }
 
 interface Message {
   from: 'them' | 'us';
   body: string;
   links?: ChatLink[];
+  therapists?: Therapist[];
+  allTherapistsUrl?: string | null;
   failed?: boolean;
 }
 
-const FRESH_STATE: ChatState = {
-  step: 'WELCOME',
-  first_name: null,
-  age: null,
-  focus_tags: [],
-};
-
-// sessionStorage, never localStorage. Someone on a shared computer asking
-// about addiction treatment must not leave the conversation for whoever sits
-// down next; a closed tab is the end of it.
-function readState(): ChatState {
-  try {
-    const raw = sessionStorage.getItem(STATE_KEY);
-    return raw ? { ...FRESH_STATE, ...JSON.parse(raw) } : FRESH_STATE;
-  } catch {
-    return FRESH_STATE;
-  }
-}
-
-function writeState(state: ChatState) {
-  try {
-    sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
-  } catch {
-    // A browser refusing storage costs continuity between turns, not the
-    // conversation. Carrying on beats failing in front of the person.
-  }
+// The tag over a reading link's title. A link of any other kind, or of none,
+// goes without one.
+function tagFor(kind: ChatLink['kind']) {
+  if (kind === 'blog') return 'Blog';
+  if (kind === 'page') return 'Page';
+  return null;
 }
 
 // Not on /arel-ops, the clinic's internal operations page: nobody there is a
@@ -81,36 +68,52 @@ function Bubble() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const stateRef = useRef<ChatState>(FRESH_STATE);
+  // The transcript as it stands on screen, for send() to read the moment it runs.
+  const messagesRef = useRef<Message[]>([]);
   const greeted = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const launcherRef = useRef<HTMLButtonElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const still = useReducedMotion();
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   async function send(text: string) {
+    // What was said before this message, exactly as it was shown: n8n compares
+    // earlier replies with its own answers character for character. The message
+    // being sent joins the transcript on the next render, so it is not in here
+    // yet. A failed turn stays out, because the assistant never said it.
+    const history = messagesRef.current
+      .filter((m) => !m.failed)
+      .slice(-MAX_HISTORY_ENTRIES)
+      .map(({ from, body }) => ({ from, body }));
+
     setSending(true);
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, state: stateRef.current }),
+        body: JSON.stringify({ message: text, history }),
       });
 
       if (!res.ok) throw new Error(String(res.status));
 
+      // An answer with no reply in it is a failure like any other, and gets the
+      // same way out.
       const data = await res.json();
-      if (data?.state) {
-        stateRef.current = { ...stateRef.current, ...data.state };
-        writeState(stateRef.current);
-      }
+      if (typeof data?.reply !== 'string') throw new Error('no reply');
 
       setMessages((prev) => [
         ...prev,
         {
           from: 'them',
-          body: typeof data?.reply === 'string' ? data.reply : FAILURE_LINE,
-          links: Array.isArray(data?.links) ? data.links : [],
+          body: data.reply,
+          links: Array.isArray(data.links) ? data.links : [],
+          therapists: Array.isArray(data.therapists) ? data.therapists : [],
+          allTherapistsUrl:
+            typeof data.allTherapistsUrl === 'string' ? data.allTherapistsUrl : null,
         },
       ]);
     } catch {
@@ -122,13 +125,12 @@ function Bubble() {
     }
   }
 
-  // The engine greets at its WELCOME step, so opening sends one empty turn.
-  // Holding a copy of the greeting here would be a second place for approved
-  // copy to live, and the two would drift.
+  // The assistant answers an empty message with its intro, so opening sends one
+  // empty turn. Holding a copy of the intro here would be a second place for
+  // that copy to live, and the two would drift.
   useEffect(() => {
     if (!open || greeted.current) return;
     greeted.current = true;
-    stateRef.current = readState();
     void send('');
   }, [open]);
 
@@ -177,7 +179,7 @@ function Bubble() {
         {open && (
           <motion.div
             role="dialog"
-            aria-label="Chat with Hope Trust"
+            aria-label="Chat with the Hope Trust AI Assistant"
             initial={still ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={still ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
@@ -215,7 +217,7 @@ function Bubble() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold leading-tight tracking-[-0.01em] text-white">
-                    Hope Trust
+                    Hope Trust AI Assistant
                   </p>
                   <p className="mt-1 flex items-center gap-1.5 text-[10px] font-medium uppercase leading-none tracking-[0.09em] text-white/60">
                     <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -279,6 +281,63 @@ function Bubble() {
 
                   </div>
 
+                  {/* A therapist's row opens their profile, which has their
+                      Book button. See all therapists can come alone: the fee
+                      and therapist answers offer the list without naming
+                      anyone. */}
+                  {m.from === 'them' &&
+                    ((m.therapists && m.therapists.length > 0) || m.allTherapistsUrl) && (
+                      <div className="mt-2 w-[88%]">
+                        {m.therapists && m.therapists.length > 0 && (
+                          <>
+                            <p className="mb-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-[#00373E]/60">
+                              Therapists who help with this
+                            </p>
+                            <ul className="ml-0 space-y-1.5">
+                              {m.therapists.map((t) => (
+                                <li key={t.url}>
+                                  <a
+                                    href={t.url}
+                                    className="group flex items-center gap-2.5 rounded-xl border border-[#00373E]/10 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,55,62,0.06)] transition-all hover:border-[#ED7428]/40 hover:shadow-[0_2px_10px_-3px_rgba(0,55,62,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={t.photo}
+                                      alt=""
+                                      width={34}
+                                      height={34}
+                                      className="h-[34px] w-[34px] shrink-0 rounded-full bg-[#F7F5EF] object-cover"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-[13px] font-semibold leading-snug text-[#00373E]">
+                                        {t.name}
+                                      </span>
+                                      <span className="block text-[12px] leading-snug text-[#00373E]/70">
+                                        {t.line}
+                                      </span>
+                                    </span>
+                                    <ArrowUpRight
+                                      className="h-3.5 w-3.5 shrink-0 text-[#00373E]/30 transition-colors group-hover:text-[#ED7428]"
+                                      aria-hidden="true"
+                                    />
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {m.allTherapistsUrl && (
+                          <a
+                            href={m.allTherapistsUrl}
+                            className="mt-1 inline-flex items-center gap-1 rounded-md px-0.5 py-1 text-[13px] font-semibold text-[#00373E] transition-colors hover:text-[#ED7428] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40"
+                          >
+                            See all therapists
+                            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
                   {/* These arrive as full article titles, not short labels, and
                       they are the way out of the chat and into help. On the
                       cream ground they carry their own weight; nested inside
@@ -292,22 +351,32 @@ function Bubble() {
                           in globals.css, which would otherwise push these off
                           the message's left edge. */}
                       <ul className="ml-0 space-y-1.5">
-                        {m.links.map((l) => (
-                          <li key={l.url}>
-                            <a
-                              href={l.url}
-                              className="group flex items-start gap-2.5 rounded-xl border border-[#00373E]/10 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,55,62,0.06)] transition-all hover:border-[#ED7428]/40 hover:shadow-[0_2px_10px_-3px_rgba(0,55,62,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40"
-                            >
-                              <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-[#00373E]">
-                                {l.label}
-                              </span>
-                              <ArrowUpRight
-                                className="mt-px h-3.5 w-3.5 shrink-0 text-[#00373E]/30 transition-colors group-hover:text-[#ED7428]"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          </li>
-                        ))}
+                        {m.links.map((l) => {
+                          const tag = tagFor(l.kind);
+                          return (
+                            <li key={l.url}>
+                              <a
+                                href={l.url}
+                                className="group flex items-start gap-2.5 rounded-xl border border-[#00373E]/10 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,55,62,0.06)] transition-all hover:border-[#ED7428]/40 hover:shadow-[0_2px_10px_-3px_rgba(0,55,62,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  {tag && (
+                                    <span className="mb-1 block text-[11px] font-semibold uppercase leading-none tracking-[0.09em] text-[#00373E]/70">
+                                      {tag}
+                                    </span>
+                                  )}
+                                  <span className="block text-[13px] font-medium leading-snug text-[#00373E]">
+                                    {l.label}
+                                  </span>
+                                </span>
+                                <ArrowUpRight
+                                  className="mt-px h-3.5 w-3.5 shrink-0 text-[#00373E]/30 transition-colors group-hover:text-[#ED7428]"
+                                  aria-hidden="true"
+                                />
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
@@ -348,7 +417,7 @@ function Bubble() {
                 ref={inputRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type your message"
+                placeholder="Ask about therapists, services or articles…"
                 autoComplete="off"
                 enterKeyHint="send"
                 className="min-w-0 flex-1 rounded-full bg-[#F7F5EF] px-4 py-2.5 text-[14px] text-[#374151] outline-none ring-1 ring-[#00373E]/10 transition-shadow placeholder:text-[#00373E]/30 focus:ring-2 focus:ring-[#00373E]/50"
