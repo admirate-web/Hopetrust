@@ -46,6 +46,31 @@ function json(body, status, cors) {
   });
 }
 
+// The assistant reads the last few messages to follow the conversation, and the
+// browser is the only place they are kept. Only who spoke and what they said
+// goes on: the last six such entries, each body cut to 1,000 characters.
+// A body is cut and never trimmed or tidied. n8n compares earlier replies with
+// its own answers character for character to choose what to say next.
+const MAX_HISTORY_ENTRIES = 6;
+const MAX_HISTORY_BODY_LENGTH = 1000;
+
+function cleanHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter(
+      (entry) =>
+        entry &&
+        (entry.from === "us" || entry.from === "them") &&
+        typeof entry.body === "string"
+    )
+    .slice(-MAX_HISTORY_ENTRIES)
+    .map((entry) => ({
+      from: entry.from,
+      body: entry.body.slice(0, MAX_HISTORY_BODY_LENGTH),
+    }));
+}
+
 export default async (request) => {
   const cors = getCorsHeaders(request);
 
@@ -79,7 +104,6 @@ export default async (request) => {
   }
 
   const message = typeof body?.message === "string" ? body.message : "";
-  const state = body?.state && typeof body.state === "object" ? body.state : {};
 
   try {
     const res = await fetch(crmUrl, {
@@ -88,7 +112,7 @@ export default async (request) => {
         "Content-Type": "application/json",
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ message, state }),
+      body: JSON.stringify({ message, history: cleanHistory(body?.history) }),
     });
 
     const data = await res.json();

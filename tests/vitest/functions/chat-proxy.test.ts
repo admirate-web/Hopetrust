@@ -41,14 +41,37 @@ describe('chat proxy', () => {
     expect(await res.text()).not.toContain('test-token');
   });
 
-  it('forwards the state the browser is carrying', async () => {
+  it('forwards the last six messages of history, cleaned', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
+    const history = [
+      ...Array.from({ length: 8 }, (_, i) => ({ from: i % 2 ? 'them' : 'us', body: `m${i}` })),
+      { from: 'admin', body: 'x' }, { from: 'us', body: 'y'.repeat(5000) }
+    ];
+    await handler(post({ message: 'and the first one?', history, state: { step: 'X' } }, { ip: '10.0.2.1' }));
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.history).toHaveLength(6);
+    expect(sent.history[5].body).toHaveLength(1000);
+    expect(sent.history.some((h: { from: string }) => h.from === 'admin')).toBe(false);
+    expect(sent.state).toBeUndefined();
+  });
 
-    const state = { step: 'ASK_AGE', first_name: 'Priya', age: null, focus_tags: [] };
-    await handler(post({ message: '34', state }, { ip: '10.0.2.1' }));
+  it('forwards an empty history when the browser sends rubbish', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await handler(post({ message: 'hi', history: 'nope' }, { ip: '10.0.2.2' }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).history).toEqual([]);
+  });
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).state).toEqual(state);
+  // A body arrives exactly as written, because n8n matches earlier replies
+  // against its own answers character for character. Only who spoke and what
+  // they said go with it.
+  it('passes each body on exactly as written, with only who spoke', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const body = '  Our coordinators\n\ncan help.  ';
+    await handler(post({ message: 'ok', history: [{ from: 'them', body, at: 1 }] }, { ip: '10.0.2.3' }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).history).toEqual([{ from: 'them', body }]);
   });
 
   it('refuses a request from an origin that is not the site', async () => {
