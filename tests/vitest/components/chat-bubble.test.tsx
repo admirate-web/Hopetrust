@@ -184,6 +184,76 @@ describe('ChatBubble', () => {
     expect(link.textContent).toBe('Book a session');
   });
 
+  // What comes back is n8n's own, but a row it cannot draw must cost only that
+  // row, never the conversation.
+  it('draws only the rows and links that have what they need', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'That sounds hard.',
+      links: [
+        null,
+        'Intervention Services',
+        { label: 'No address' },
+        { label: 'Not a web address', url: 'javascript:alert(1)' },
+        { label: 'Intervention Services', url: 'https://hopetrustindia.com/intervention-services/', kind: 'page' }
+      ],
+      therapists: [
+        null,
+        { name: 'No profile', line: 'Anxiety', photo: 'https://example.com/n.jpg' },
+        { name: 'Rahul Luther', line: 'Substance use disorders', photo: 'https://example.com/r.jpg', url: 'https://hopetrustindia.com/therapists/rahul-luther/' }
+      ],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    expect(await screen.findByText('That sounds hard.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /intervention services/i }).getAttribute('href')).toBe('https://hopetrustindia.com/intervention-services/');
+    expect(screen.getByRole('link', { name: /rahul luther/i }).getAttribute('href')).toBe('https://hopetrustindia.com/therapists/rahul-luther/');
+    expect(screen.queryByText('No address')).toBeNull();
+    expect(screen.queryByText('Not a web address')).toBeNull();
+    expect(screen.queryByText('No profile')).toBeNull();
+  });
+
+  // The answer to "where are you?" ends in the map's address, and an address
+  // that cannot be tapped is no use on a phone.
+  it('turns an address in a reply into a link that opens in a new tab', async () => {
+    const map = 'https://maps.app.goo.gl/1jBEohMn1fL8RGua7?g_st=ic';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: `We're in Banjara Hills, Hyderabad. You can find us here: ${map}`,
+      links: [],
+      therapists: [],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    const link = await screen.findByRole('link', { name: map });
+    expect(link.getAttribute('href')).toBe(map);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(screen.getByText("We're in Banjara Hills, Hyderabad. You can find us here:", { exact: false })).toBeTruthy();
+  });
+
+  it('leaves the full stop after an address out of the link', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'It is all at https://example.com/a.',
+      links: [],
+      therapists: [],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    expect((await screen.findByRole('link', { name: 'https://example.com/a' })).getAttribute('href')).toBe('https://example.com/a');
+  });
+
+  it("leaves an address in the visitor's own message as they typed it", async () => {
+    await open();
+    await screen.findByText('Hi there.');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'is this you? https://example.com/x' } });
+    fireEvent.submit(screen.getByRole('form'));
+    await waitFor(() => expect(screen.getAllByText('Hi there.')).toHaveLength(2));
+    expect(screen.getByText('is this you? https://example.com/x')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'https://example.com/x' })).toBeNull();
+  });
+
   // A failed turn offers a real way out, not just an apology. Every failed
   // turn carries one, so this asserts presence rather than uniqueness.
   it('offers WhatsApp when the proxy fails', async () => {

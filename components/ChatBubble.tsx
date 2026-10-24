@@ -55,6 +55,54 @@ function tagFor(kind: ChatLink['kind']) {
   return null;
 }
 
+// An address a visitor can open from here: never javascript: or a bare path.
+function isWebAddress(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+}
+
+// What comes back is n8n's own, and it never sends a broken row. These are a
+// guard all the same: one entry missing a field would throw while drawing and
+// take the whole conversation with it.
+function isLink(entry: unknown): entry is ChatLink {
+  const l = entry as Partial<ChatLink> | null;
+  return typeof l === 'object' && l !== null && typeof l.label === 'string' && isWebAddress(l.url);
+}
+
+function isTherapist(entry: unknown): entry is Therapist {
+  const t = entry as Partial<Therapist> | null;
+  return (
+    typeof t === 'object' &&
+    t !== null &&
+    typeof t.name === 'string' &&
+    typeof t.line === 'string' &&
+    typeof t.photo === 'string' &&
+    isWebAddress(t.url)
+  );
+}
+
+// The approved answer to "where are you?" ends in the map's address. The
+// assistant's own words never carry one, because its guard turns links away.
+// An address never ends in punctuation, so a full stop after one stays text.
+const ADDRESS = /(https?:\/\/\S*[^\s.,;:!?)\]'"])/;
+
+function withAddressesLinked(text: string) {
+  return text.split(ADDRESS).map((part, i) =>
+    i % 2 === 1 ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-words font-medium text-[#00373E] underline decoration-[#00373E]/30 underline-offset-2 transition-colors hover:text-[#ED7428] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED7428]/40"
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
+
 // Not on /arel-ops, the clinic's internal operations page: nobody there is a
 // patient looking for help, and the old WhatsApp button stayed off it too.
 export default function ChatBubble() {
@@ -68,24 +116,19 @@ function Bubble() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  // The transcript as it stands on screen, for send() to read the moment it runs.
-  const messagesRef = useRef<Message[]>([]);
   const greeted = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const launcherRef = useRef<HTMLButtonElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const still = useReducedMotion();
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  async function send(text: string) {
-    // What was said before this message, exactly as it was shown: n8n compares
-    // earlier replies with its own answers character for character. The message
-    // being sent joins the transcript on the next render, so it is not in here
-    // yet. A failed turn stays out, because the assistant never said it.
-    const history = messagesRef.current
+  // shown is what was said before this message, exactly as it was shown: n8n
+  // compares earlier replies with its own answers character for character. The
+  // message being sent joins the transcript on the next render, so it is not in
+  // there yet.
+  async function send(text: string, shown: Message[]) {
+    // A failed turn stays out, because the assistant never said it.
+    const history = shown
       .filter((m) => !m.failed)
       .slice(-MAX_HISTORY_ENTRIES)
       .map(({ from, body }) => ({ from, body }));
@@ -110,8 +153,8 @@ function Bubble() {
         {
           from: 'them',
           body: data.reply,
-          links: Array.isArray(data.links) ? data.links : [],
-          therapists: Array.isArray(data.therapists) ? data.therapists : [],
+          links: Array.isArray(data.links) ? data.links.filter(isLink) : [],
+          therapists: Array.isArray(data.therapists) ? data.therapists.filter(isTherapist) : [],
           allTherapistsUrl:
             typeof data.allTherapistsUrl === 'string' ? data.allTherapistsUrl : null,
         },
@@ -131,7 +174,7 @@ function Bubble() {
   useEffect(() => {
     if (!open || greeted.current) return;
     greeted.current = true;
-    void send('');
+    void send('', []);
   }, [open]);
 
   useEffect(() => {
@@ -168,7 +211,10 @@ function Bubble() {
     if (!text || sending) return;
     setDraft('');
     setMessages((prev) => [...prev, { from: 'us', body: text }]);
-    void send(text);
+    // The transcript this render drew, which is what the visitor saw when they
+    // pressed send, a reply that has only just appeared included. A copy kept
+    // in a ref by an effect could still be a render behind.
+    void send(text, messages);
   }
 
   const armed = draft.trim().length > 0 && !sending;
@@ -265,7 +311,9 @@ function Bubble() {
                         : 'max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 text-[14px] leading-[1.55] text-[#374151] shadow-[0_1px_2px_rgba(0,55,62,0.06),0_4px_12px_-6px_rgba(0,55,62,0.14)]'
                     }
                   >
-                    <p className="whitespace-pre-wrap">{m.body}</p>
+                    <p className="whitespace-pre-wrap">
+                      {m.from === 'them' ? withAddressesLinked(m.body) : m.body}
+                    </p>
 
                     {m.failed && (
                       <a
@@ -290,7 +338,7 @@ function Bubble() {
                       <div className="mt-2 w-[88%]">
                         {m.therapists && m.therapists.length > 0 && (
                           <>
-                            <p className="mb-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-[#00373E]/60">
+                            <p className="mb-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-[#00373E]/70">
                               Therapists who help with this
                             </p>
                             <ul className="ml-0 space-y-1.5">
@@ -344,7 +392,7 @@ function Bubble() {
                       the bubble they read as footnotes. */}
                   {m.from === 'them' && m.links && m.links.length > 0 && (
                     <div className="mt-2 w-[88%]">
-                      <p className="mb-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-[#00373E]/60">
+                      <p className="mb-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-[#00373E]/70">
                         Related reading
                       </p>
                       {/* ml-0 defeats the site-wide `ul { margin-left: 1rem }`
