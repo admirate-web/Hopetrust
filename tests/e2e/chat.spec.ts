@@ -1,18 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-// CHAT BUBBLE DISABLED — the widget is not mounted in app/layout.tsx, so every
-// assertion here would fail on a page that is behaving correctly. Skipped
-// rather than deleted: the moment the bubble goes back on the page, dropping
-// this line is what proves it still works.
-test.skip(() => true, 'chat bubble is disabled in app/layout.tsx');
-
 // The proxy is stubbed: this proves the bubble is mounted, opens, sends and
 // renders what comes back. Whether the engine behind it answers correctly is
 // the CRM repo's suite, and its own operator checklist.
 const REPLY = {
-  reply: 'May I take your first name?',
+  reply: 'Hi there.',
   links: [],
-  state: { step: 'ASK_NAME', first_name: null, age: null, focus_tags: [] }
+  therapists: [],
+  allTherapistsUrl: null,
+  state: {}
 };
 
 function stubChat(page: import('@playwright/test').Page, body: unknown = REPLY, status = 200) {
@@ -26,9 +22,11 @@ test('the bubble opens and answers', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: /chat/i }).click();
-  await page.getByRole('textbox').fill('hello');
-  await page.getByRole('textbox').press('Enter');
-  await expect(page.getByText('May I take your first name?').first()).toBeVisible();
+  // The page has textboxes of its own, such as the newsletter form's.
+  const chat = page.getByRole('dialog', { name: 'Chat with the Hope Trust AI Assistant' });
+  await chat.getByRole('textbox').fill('hello');
+  await chat.getByRole('textbox').press('Enter');
+  await expect(page.getByText('Hi there.').first()).toBeVisible();
 });
 
 // It has to be on every route, including blog posts — that is where someone

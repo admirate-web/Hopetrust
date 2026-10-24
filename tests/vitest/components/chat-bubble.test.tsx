@@ -17,11 +17,7 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(
-      reply({
-        reply: 'Hello, and welcome to Hope Trust.',
-        links: [],
-        state: { step: 'ASK_NAME' }
-      })
+      reply({ reply: 'Hi there.', links: [], therapists: [], allTherapistsUrl: null, state: {} })
     )
   );
 });
@@ -40,46 +36,133 @@ describe('ChatBubble', () => {
     expect(await screen.findByRole('log')).toBeTruthy();
   });
 
-  // The engine greets at its WELCOME step, so opening sends one empty turn
-  // rather than the widget holding a second copy of the greeting to drift.
+  // The assistant answers an empty message with its intro, so opening sends one
+  // empty turn rather than the widget holding a second copy of the intro to drift.
   it('greets without the visitor having to say anything', async () => {
     await open();
-    await waitFor(() => expect(screen.getByText(/welcome to Hope Trust/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Hi there.')).toBeTruthy());
   });
 
   it('shows the reply that comes back', async () => {
     await open();
     fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'hi' } });
     fireEvent.submit(screen.getByRole('form'));
-    await waitFor(() => expect(screen.getByText(/welcome to Hope Trust/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('Hi there.')).toHaveLength(2));
   });
 
   // Someone on a shared computer asking about addiction treatment must not
   // leave the conversation sitting there for the next person.
-  it('keeps state in sessionStorage, not localStorage', async () => {
+  it('stores nothing in sessionStorage or localStorage', async () => {
     await open();
     fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'hi' } });
     fireEvent.submit(screen.getByRole('form'));
-    await waitFor(() => expect(sessionStorage.getItem('ht_chat_state')).toBeTruthy());
-    expect(localStorage.getItem('ht_chat_state')).toBeNull();
+    await waitFor(() => expect(screen.getAllByText('Hi there.')).toHaveLength(2));
+    expect(sessionStorage.length).toBe(0);
+    expect(localStorage.length).toBe(0);
   });
 
-  it('sends the state it was carrying back with the next message', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      reply({ reply: 'Thank you.', links: [], state: { step: 'ASK_AGE', first_name: 'Priya' } })
-    );
+  it('sends the conversation so far with the next message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply({ reply: 'Hi there.', links: [], therapists: [], allTherapistsUrl: null, state: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+    await open();
+    await screen.findByText('Hi there.');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'who treats OCD?' } });
+    fireEvent.submit(screen.getByRole('form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body.message).toBe('who treats OCD?');
+    expect(body.history).toEqual([{ from: 'them', body: 'Hi there.' }]);
+    expect(body.state).toBeUndefined();
+  });
+
+  // n8n compares earlier replies with its own answers character for character,
+  // so each goes back exactly as it was shown. The opening turn has nothing
+  // before it, and a failed turn is not something the assistant said.
+  it('sends each message back as it was shown, leaving failed turns out', async () => {
+    const intro = '  Hi.\n\nAsk me anything.  ';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply({ reply: intro, links: [], therapists: [], allTherapistsUrl: null, state: {} }))
+      .mockResolvedValueOnce({ ok: false, status: 502 })
+      .mockResolvedValue(reply({ reply: 'Hi there.', links: [], therapists: [], allTherapistsUrl: null, state: {} }));
     vi.stubGlobal('fetch', fetchMock);
 
     await open();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-
-    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Priya' } });
+    await screen.findByText(/Ask me anything/);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello' } });
     fireEvent.submit(screen.getByRole('form'));
+    await screen.findByRole('link', { name: /WhatsApp/i });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'who treats OCD?' } });
+    fireEvent.submit(screen.getByRole('form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    const sent = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(sent.message).toBe('Priya');
-    expect(sent.state.step).toBe('ASK_AGE');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ message: '', history: [] });
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
+      message: 'who treats OCD?',
+      history: [
+        { from: 'them', body: intro },
+        { from: 'us', body: 'hello' }
+      ]
+    });
+  });
+
+  it('sends no more than the last six messages', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply({ reply: 'Hi there.', links: [], therapists: [], allTherapistsUrl: null, state: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await open();
+    const said = ['one', 'two', 'three', 'four'];
+    for (let i = 0; i < said.length; i++) {
+      await waitFor(() => expect(screen.getAllByText('Hi there.')).toHaveLength(i + 1));
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: said[i] } });
+      fireEvent.submit(screen.getByRole('form'));
+    }
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+
+    expect(JSON.parse(fetchMock.mock.calls[4][1].body).history).toEqual([
+      { from: 'us', body: 'one' },
+      { from: 'them', body: 'Hi there.' },
+      { from: 'us', body: 'two' },
+      { from: 'them', body: 'Hi there.' },
+      { from: 'us', body: 'three' },
+      { from: 'them', body: 'Hi there.' }
+    ]);
+  });
+
+  it('names itself as the Hope Trust AI Assistant', async () => {
+    await open();
+    expect(screen.getByText('Hope Trust AI Assistant')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Ask about therapists, services or articles…')).toBeTruthy();
+  });
+
+  it('shows therapist rows, the all-therapists link and tagged reading', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'That sounds hard.',
+      links: [{ label: 'Intervention Services', url: 'https://hopetrustindia.com/intervention-services/', kind: 'page' }],
+      therapists: [{ name: 'Rahul Luther', line: 'Substance use disorders · Behavioural addictions', photo: 'https://example.com/r.jpg', url: 'https://hopetrustindia.com/therapists/rahul-luther/' }],
+      allTherapistsUrl: 'https://hopetrustindia.com/book-your-session/',
+      state: {}
+    })));
+    await open();
+    expect((await screen.findByRole('link', { name: /rahul luther/i })).getAttribute('href')).toBe('https://hopetrustindia.com/therapists/rahul-luther/');
+    expect(screen.getByRole('link', { name: /see all therapists/i }).getAttribute('href')).toBe('https://hopetrustindia.com/book-your-session/');
+    expect(screen.getByText('Therapists who help with this')).toBeTruthy();
+    expect(screen.getByText('Page')).toBeTruthy();
+  });
+
+  // The fee and therapist answers offer to show the therapists without naming
+  // anyone, so the link comes alone, with no heading over rows that aren't there.
+  it('offers all the therapists under an answer that names none', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'Would you like me to show you the available therapists?',
+      links: [],
+      therapists: [],
+      allTherapistsUrl: 'https://hopetrustindia.com/book-your-session/',
+      state: {}
+    })));
+    await open();
+    expect((await screen.findByRole('link', { name: /see all therapists/i })).getAttribute('href')).toBe('https://hopetrustindia.com/book-your-session/');
+    expect(screen.queryByText('Therapists who help with this')).toBeNull();
   });
 
   it('renders the links the engine returned', async () => {
@@ -97,6 +180,91 @@ describe('ChatBubble', () => {
     await open();
     const link = await screen.findByRole('link', { name: /book a session/i });
     expect(link.getAttribute('href')).toBe('https://hopetrustindia.com/book-your-session');
+    // No kind, so no tag above the title.
+    expect(link.textContent).toBe('Book a session');
+  });
+
+  // What comes back is n8n's own, but a row it cannot draw must cost only that
+  // row, never the conversation.
+  it('draws only the rows and links that have what they need', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'That sounds hard.',
+      links: [
+        null,
+        'Intervention Services',
+        { label: 'No address' },
+        { label: 'Not a web address', url: 'javascript:alert(1)' },
+        { label: 'Intervention Services', url: 'https://hopetrustindia.com/intervention-services/', kind: 'page' }
+      ],
+      therapists: [
+        null,
+        { name: 'No profile', line: 'Anxiety', photo: 'https://example.com/n.jpg' },
+        { name: 'Rahul Luther', line: 'Substance use disorders', photo: 'https://example.com/r.jpg', url: 'https://hopetrustindia.com/therapists/rahul-luther/' }
+      ],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    expect(await screen.findByText('That sounds hard.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /intervention services/i }).getAttribute('href')).toBe('https://hopetrustindia.com/intervention-services/');
+    expect(screen.getByRole('link', { name: /rahul luther/i }).getAttribute('href')).toBe('https://hopetrustindia.com/therapists/rahul-luther/');
+    expect(screen.queryByText('No address')).toBeNull();
+    expect(screen.queryByText('Not a web address')).toBeNull();
+    expect(screen.queryByText('No profile')).toBeNull();
+  });
+
+  it('leaves out See all therapists when its address is not a web address', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'Would you like me to show you the available therapists?',
+      links: [],
+      therapists: [],
+      allTherapistsUrl: 'javascript:alert(1)',
+      state: {}
+    })));
+    await open();
+    expect(await screen.findByText('Would you like me to show you the available therapists?')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /see all therapists/i })).toBeNull();
+  });
+
+  // The answer to "where are you?" ends in the map's address, and an address
+  // that cannot be tapped is no use on a phone.
+  it('turns an address in a reply into a link that opens in a new tab', async () => {
+    const map = 'https://maps.app.goo.gl/1jBEohMn1fL8RGua7?g_st=ic';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: `We're in Banjara Hills, Hyderabad. You can find us here: ${map}`,
+      links: [],
+      therapists: [],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    const link = await screen.findByRole('link', { name: map });
+    expect(link.getAttribute('href')).toBe(map);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(screen.getByText("We're in Banjara Hills, Hyderabad. You can find us here:", { exact: false })).toBeTruthy();
+  });
+
+  it('leaves the full stop after an address out of the link', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'It is all at https://example.com/a.',
+      links: [],
+      therapists: [],
+      allTherapistsUrl: null,
+      state: {}
+    })));
+    await open();
+    expect((await screen.findByRole('link', { name: 'https://example.com/a' })).getAttribute('href')).toBe('https://example.com/a');
+  });
+
+  it("leaves an address in the visitor's own message as they typed it", async () => {
+    await open();
+    await screen.findByText('Hi there.');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'is this you? https://example.com/x' } });
+    fireEvent.submit(screen.getByRole('form'));
+    await waitFor(() => expect(screen.getAllByText('Hi there.')).toHaveLength(2));
+    expect(screen.getByText('is this you? https://example.com/x')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'https://example.com/x' })).toBeNull();
   });
 
   // A failed turn offers a real way out, not just an apology. Every failed
@@ -117,6 +285,14 @@ describe('ChatBubble', () => {
     await open();
     fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'hi' } });
     fireEvent.submit(screen.getByRole('form'));
+    expect((await screen.findAllByRole('link', { name: /WhatsApp/i })).length).toBeGreaterThan(0);
+  });
+
+  // What n8n sends when its webhook answers before the workflow runs: a 200
+  // with nothing to show, which is a failure like any other.
+  it('offers WhatsApp when an answer comes back with no reply in it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ message: 'Workflow was started' })));
+    await open();
     expect((await screen.findAllByRole('link', { name: /WhatsApp/i })).length).toBeGreaterThan(0);
   });
 
