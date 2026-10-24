@@ -155,8 +155,7 @@ function Bubble() {
           body: data.reply,
           links: Array.isArray(data.links) ? data.links.filter(isLink) : [],
           therapists: Array.isArray(data.therapists) ? data.therapists.filter(isTherapist) : [],
-          allTherapistsUrl:
-            typeof data.allTherapistsUrl === 'string' ? data.allTherapistsUrl : null,
+          allTherapistsUrl: isWebAddress(data.allTherapistsUrl) ? data.allTherapistsUrl : null,
         },
       ]);
     } catch {

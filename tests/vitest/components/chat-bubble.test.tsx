@@ -213,6 +213,19 @@ describe('ChatBubble', () => {
     expect(screen.queryByText('No profile')).toBeNull();
   });
 
+  it('leaves out See all therapists when its address is not a web address', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({
+      reply: 'Would you like me to show you the available therapists?',
+      links: [],
+      therapists: [],
+      allTherapistsUrl: 'javascript:alert(1)',
+      state: {}
+    })));
+    await open();
+    expect(await screen.findByText('Would you like me to show you the available therapists?')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /see all therapists/i })).toBeNull();
+  });
+
   // The answer to "where are you?" ends in the map's address, and an address
   // that cannot be tapped is no use on a phone.
   it('turns an address in a reply into a link that opens in a new tab', async () => {
