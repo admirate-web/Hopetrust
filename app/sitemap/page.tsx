@@ -3,20 +3,9 @@ import { getDoctorsForBuild } from '@/lib/doctors';
 import { getArchiveCategories, getAllPostsMeta, pageCount } from '@/lib/blog';
 import Header from '@/components/Header';
 import dynamic from 'next/dynamic';
-import { Bricolage_Grotesque } from 'next/font/google';
 import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 const Footer = dynamic(() => import('@/components/Footer'));
-
-const headingFont = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['600', '700'],
-});
-
-const bodyFont = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-});
 
 export const metadata = {
   title: 'Sitemap',
@@ -114,12 +103,12 @@ export default async function SitemapPage() {
       <main className="min-h-screen bg-[#F7F5EF]">
         <section className="mx-auto max-w-4xl px-4 sm:px-8 pb-20 pt-32 sm:pt-36">
           <h1
-            className={`${headingFont.className} text-3xl sm:text-4xl lg:text-5xl font-bold text-[#00373E] mb-4`}
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#00373E] mb-4"
           >
             Sitemap
           </h1>
           <p
-            className={`${bodyFont.className} text-base sm:text-lg text-[#00373E]/70 mb-12`}
+            className="text-base sm:text-lg text-[#00373E]/70 mb-12"
           >
             A complete list of all pages on our website.
           </p>
@@ -128,7 +117,7 @@ export default async function SitemapPage() {
             {allSections.map((section) => (
               <div key={section.title}>
                 <h2
-                  className={`${headingFont.className} text-xl sm:text-2xl font-semibold text-[#00373E] mb-4 border-b-2 border-[#ED7428]/30 pb-2`}
+                  className="text-xl sm:text-2xl font-semibold text-[#00373E] mb-4 border-b-2 border-[#ED7428]/30 pb-2"
                 >
                   {section.title}
                 </h2>
@@ -137,7 +126,7 @@ export default async function SitemapPage() {
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className={`${bodyFont.className} text-[#00373E] hover:text-[#ED7428] transition-colors text-base sm:text-lg`}
+                        className="text-[#00373E] hover:text-[#ED7428] transition-colors text-base sm:text-lg"
                       >
                         {link.label}
                       </Link>
