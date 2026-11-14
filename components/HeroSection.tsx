@@ -91,7 +91,7 @@ const HeroSection = () => {
               <h1
                 className={`${heroFont.className} fade-in-optimized text-[12px] sm:text-[14px] lg:text-[15px] font-semibold uppercase tracking-[0.16em] text-[#FFFAD4]`}
               >
-                Mental health &amp; de-addiction centre · Hyderabad
+                Mental health &amp; Psychological centre · Hyderabad
               </h1>
 
               <p
