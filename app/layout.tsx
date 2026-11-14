@@ -25,7 +25,7 @@ const inter = Inter({
  * drew no clicks. The default now names the service and the city; the tagline
  * stays on the page.
  */
-const HOME_TITLE = 'Hope Trust | Mental Health & De-Addiction Centre in Hyderabad';
+const HOME_TITLE = 'Hope Trust | Mental Health & Psychological Centre in Hyderabad';
 const HOME_DESCRIPTION =
   'Since 2002, Hope Trust in Banjara Hills, Hyderabad has offered therapy, psychiatry, couples counselling and de-addiction treatment, in person and online.';
 
