@@ -11,6 +11,7 @@ import {
   ISSUE_LIMITS,
   blogIssueFields,
   broadcastMarker,
+  canDeleteIssue,
   issueDraftSchema,
   issueRenderOptions,
   postSlugFromLink,
@@ -199,8 +200,15 @@ async function save({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
 async function remove({ req, deps, admin, id, reply }: Ctx): Promise<Response> {
   const issue = await deps.issues.get(id);
   if (!issue) return reply({ error: 'Issue not found' }, 404);
-  if (!(await deps.issues.deleteDraft(id))) {
-    return reply({ error: 'Only drafts can be deleted. A sent issue stays as the record of what went out.' }, 409);
+  // The status guard on the delete catches a change since the read, such as a draft being sent.
+  if (!canDeleteIssue(issue, deps.now()) || !(await deps.issues.deleteIssue(id, issue.status))) {
+    return reply(
+      {
+        error:
+          'Only drafts, and skipped or missed issues whose send time has passed, can be deleted. A sent issue stays as the record of what went out.',
+      },
+      409,
+    );
   }
   await deps.db.audit({
     action: 'NEWSLETTER_ISSUE_DELETE',

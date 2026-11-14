@@ -154,6 +154,30 @@ describe('admin-newsletter-issues', () => {
     expect((await call(t.deps, 'DELETE', `?id=${MISSING}`)).status).toBe(404);
   });
 
+  it('deletes skipped and missed issues once their send time has passed, and keeps the rest', async () => {
+    const t = makeDeps(); // The fake clock reads Wed 14 Oct 2026, 10:00 UTC.
+    const past = '2026-10-06T04:30:00.000Z';
+    const ahead = '2026-10-20T04:30:00.000Z';
+    const skipped = t.issueStore.seed({ kind: 'blog', status: 'skipped', scheduled_for: past, reason: 'There are no subscribers.' });
+    const missed = t.issueStore.seed({ kind: 'blog', status: 'missed', scheduled_for: past });
+    for (const issue of [skipped, missed]) {
+      expect((await call(t.deps, 'DELETE', `?id=${issue.id}`)).status).toBe(200);
+      expect(t.issueStore.get(issue.id)).toBeUndefined();
+    }
+    expect(t.memory.audits.filter((a) => a.action === 'NEWSLETTER_ISSUE_DELETE')).toHaveLength(2);
+
+    const upcomingSkip = t.issueStore.seed({ kind: 'blog', status: 'skipped', scheduled_for: ahead });
+    const scheduled = t.issueStore.seed({ ...READY, kind: 'blog', status: 'scheduled', scheduled_for: ahead });
+    for (const issue of [upcomingSkip, scheduled]) {
+      const res = await call(t.deps, 'DELETE', `?id=${issue.id}`);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe(
+        'Only drafts, and skipped or missed issues whose send time has passed, can be deleted. A sent issue stays as the record of what went out.',
+      );
+      expect(t.issueStore.get(issue.id)).toBeDefined();
+    }
+  });
+
   it("hands out an upload URL inside the issue's folder, for JPEG and PNG only", async () => {
     const t = makeDeps();
     const issue = t.issueStore.seed();

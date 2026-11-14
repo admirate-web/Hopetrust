@@ -307,6 +307,22 @@ describe('IssueEditor', () => {
     expect(screen.queryByRole('button', { name: /Send to subscribers/ })).not.toBeInTheDocument();
   });
 
+  it('deletes a skipped issue once its send time has passed', async () => {
+    const { onClose } = open({ kind: 'blog', status: 'skipped', scheduled_for: '2020-01-07T04:30:00.000Z', reason: 'There are no subscribers.' });
+    vi.mocked(api.deleteIssue).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(await screen.findByRole('button', { name: /^Delete$/ }));
+    expect(confirm).toHaveBeenCalledWith("Delete this issue? This can't be undone.");
+    expect(api.deleteIssue).toHaveBeenCalledWith('tkn', ISSUE.id);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('offers no Delete for a skipped issue whose send time is still ahead', async () => {
+    open({ kind: 'blog', status: 'skipped', scheduled_for: '2099-01-06T04:30:00.000Z' });
+    await screen.findByLabelText('Subject');
+    expect(screen.queryByRole('button', { name: /^Delete$/ })).not.toBeInTheDocument();
+  });
+
   it('settles an unclear send with Check status', async () => {
     open({ status: 'needs_check', last_error: "We couldn't confirm whether Resend sent this issue." });
     vi.mocked(api.checkIssue).mockResolvedValue({ issue: SENT, found: true });

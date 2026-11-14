@@ -165,14 +165,14 @@ describe('createIssuesDb queries', () => {
     ]);
   });
 
-  it('deletes only drafts', async () => {
+  it('deletes an issue only while it still has the status it was read with', async () => {
     const { client, calls } = recording({ data: [{ id: 'id-1' }], error: null });
-    expect(await createIssuesDb(client).deleteDraft('id-1')).toBe(true);
+    expect(await createIssuesDb(client).deleteIssue('id-1', 'skipped')).toBe(true);
     expect(calls).toEqual([
       ['from', 'newsletter_issues'],
       ['delete'],
       ['eq', 'id', 'id-1'],
-      ['eq', 'status', 'draft'],
+      ['eq', 'status', 'skipped'],
       ['select', 'id'],
     ]);
   });
@@ -234,7 +234,7 @@ describe('the in-memory issues', () => {
     expect(locked?.status).toBe('sending');
     expect(await issues.lockForSend(draft.id, 'admin@x', 1, 'draft')).toBeNull();
     expect(await issues.saveDraft(draft.id, DRAFT, 'admin@x', locked!.updated_at)).toBeNull();
-    expect(await issues.deleteDraft(draft.id)).toBe(false);
+    expect(await issues.deleteIssue(draft.id, 'draft')).toBe(false);
     expect((await issues.markSent(draft.id, sent))?.status).toBe('sent');
   });
 

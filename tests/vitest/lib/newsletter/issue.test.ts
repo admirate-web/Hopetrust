@@ -3,6 +3,7 @@ import type { IssueForRender } from '@/lib/newsletter/content';
 import {
   EMPTY_BODY,
   broadcastName,
+  canDeleteIssue,
   cleanText,
   draftKey,
   issueDraftSchema,
@@ -278,5 +279,26 @@ describe('broadcastName', () => {
     const emoji = broadcastName({ id, subject: '😀'.repeat(100) });
     expect(emoji).toBe(`${'😀'.repeat(12)}… [issue db92f4ad-ca83-4ab2-b19a-212ec2991ae0]`);
     expect(emoji.length).toBe(70);
+  });
+});
+
+describe('canDeleteIssue', () => {
+  const now = new Date('2026-11-14T13:00:00.000Z');
+  it('allows drafts at any time', () => {
+    expect(canDeleteIssue({ status: 'draft', scheduled_for: null }, now)).toBe(true);
+    expect(canDeleteIssue({ status: 'draft', scheduled_for: '2026-12-01T04:30:00.000Z' }, now)).toBe(true);
+  });
+  it('allows skipped and missed issues once their send time has passed', () => {
+    expect(canDeleteIssue({ status: 'skipped', scheduled_for: '2026-10-27T04:30:00.000Z' }, now)).toBe(true);
+    expect(canDeleteIssue({ status: 'missed', scheduled_for: '2026-10-27T04:30:00.000Z' }, now)).toBe(true);
+    expect(canDeleteIssue({ status: 'skipped', scheduled_for: '2026-11-14T13:00:00.000Z' }, now)).toBe(true);
+  });
+  it('keeps a skipped issue whose send time is still ahead, so the fortnight stays skipped', () => {
+    expect(canDeleteIssue({ status: 'skipped', scheduled_for: '2026-11-17T04:30:00.000Z' }, now)).toBe(false);
+  });
+  it('never allows sent, sending, needs-check or scheduled issues', () => {
+    for (const status of ['sent', 'sending', 'needs_check', 'scheduled'] as const) {
+      expect(canDeleteIssue({ status, scheduled_for: '2026-10-27T04:30:00.000Z' }, now)).toBe(false);
+    }
   });
 });

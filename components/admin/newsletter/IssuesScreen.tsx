@@ -1,11 +1,13 @@
 'use client';
 
 // The Issues screen of the Newsletter tab (spec §8.1): every issue, newest
-// first, with its status. New issue starts a draft and opens it.
+// first, with its status. New issue starts a draft and opens it. Drafts, and
+// skipped or missed issues whose send time has passed, can be deleted here.
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, FilePlus2, Loader2 } from 'lucide-react';
-import { UnauthorizedError, createIssue, listIssues, type IssueList } from '@/lib/newsletter-admin';
+import { AlertTriangle, FilePlus2, Loader2, Trash2 } from 'lucide-react';
+import { UnauthorizedError, createIssue, deleteIssue, listIssues, type IssueList } from '@/lib/newsletter-admin';
+import { canDeleteIssue, type IssueSummary } from '@/lib/newsletter/issue';
 import { formatIssueDate } from '@/lib/newsletter/render';
 import { formatSlot } from '@/lib/newsletter/schedule';
 import { ISSUE_STATUS } from './issue-status';
@@ -29,6 +31,7 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
   const [data, setData] = useState<IssueList | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState('');
   const [error, setError] = useState('');
 
   const fail = useCallback(
@@ -64,6 +67,20 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
     } catch (e) {
       fail(e, "A new issue couldn't be started.");
       setCreating(false);
+    }
+  }
+
+  async function remove(issue: IssueSummary, name: string) {
+    if (!window.confirm(`Delete "${name}"? This can't be undone.`)) return;
+    setDeletingId(issue.id);
+    setError('');
+    try {
+      await deleteIssue(token, issue.id);
+      await load();
+    } catch (e) {
+      fail(e, 'Delete failed.');
+    } finally {
+      setDeletingId('');
     }
   }
 
@@ -103,18 +120,21 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Recipients</th>
               <th className="px-4 py-3 font-semibold">Sent on</th>
+              <th className="px-4 py-3">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading && !data ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </td>
               </tr>
             ) : data && data.issues.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                   No issues yet. Press New issue to write the first one.
                 </td>
               </tr>
@@ -125,6 +145,7 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
                 .sort((a, b) => Number(b.status === 'scheduled') - Number(a.status === 'scheduled'))
                 .map((issue) => {
                 const status = ISSUE_STATUS[issue.status];
+                const name = issue.subject.trim() || '(no subject)';
                 return (
                   <tr key={issue.id} className="hover:bg-[#F7F6F4]/60">
                     <td className="px-4 py-3">
@@ -133,7 +154,7 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
                         onClick={() => onOpen(issue.id)}
                         className="text-left font-semibold text-[#00373E] hover:text-[#ED7428] hover:underline"
                       >
-                        {issue.subject.trim() || '(no subject)'}
+                        {name}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{issueDate(issue.issue_date)}</td>
@@ -146,6 +167,20 @@ export default function IssuesScreen({ token, onUnauthorized, onOpen }: IssuesSc
                     </td>
                     <td className="px-4 py-3 text-gray-600">{issue.recipient_count ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(issue.sent_at)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canDeleteIssue(issue, new Date()) && (
+                        <button
+                          type="button"
+                          onClick={() => remove(issue, name)}
+                          disabled={deletingId !== ''}
+                          aria-label={`Delete ${name}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-gray-50 disabled:opacity-40"
+                        >
+                          {deletingId === issue.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          Delete
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })

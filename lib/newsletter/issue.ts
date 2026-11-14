@@ -74,6 +74,18 @@ export const NEWSLETTER_SITE_URL = 'https://hopetrustindia.com';
 export const EMPTY_BODY: BodyDoc = { type: 'doc', content: [] };
 const MAX_LIST_DEPTH = 3;
 
+/**
+ * Whether staff may delete an issue: a draft at any time, and a skipped or missed
+ * issue once its send time has passed. Before then, the skipped row is what keeps
+ * that fortnight skipped: without it the automatic run would plan the slot again.
+ * Sent issues stay as the record of what went out; the rest are mid-send or due.
+ */
+export function canDeleteIssue(issue: Pick<IssueRow, 'status' | 'scheduled_for'>, now: Date): boolean {
+  if (issue.status === 'draft') return true;
+  if (issue.status !== 'skipped' && issue.status !== 'missed') return false;
+  return issue.scheduled_for === null || Date.parse(issue.scheduled_for) <= now.getTime();
+}
+
 /** Today in India, as YYYY-MM-DD: the default date of a new issue. */
 export function todayInIndia(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {

@@ -23,7 +23,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { BodyDoc } from '@/lib/newsletter/content';
-import { ISSUE_LIMITS, draftKey, sendProblems, toDraft, todayInIndia, type IssueRow } from '@/lib/newsletter/issue';
+import { ISSUE_LIMITS, canDeleteIssue, draftKey, sendProblems, toDraft, todayInIndia, type IssueRow } from '@/lib/newsletter/issue';
 import { uploadIssueImage } from '@/lib/newsletter/issue-image';
 import { MIN_GAP_DAYS, addDays, formatSlot, sendTimeOn } from '@/lib/newsletter/schedule';
 import {
@@ -425,7 +425,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
   }
 
   async function runDelete() {
-    if (!issue || !window.confirm("Delete this draft? This can't be undone.")) return;
+    if (!issue || !window.confirm(`Delete this ${issue.status === 'draft' ? 'draft' : 'issue'}? This can't be undone.`)) return;
     setBusy('deleting');
     try {
       await deleteIssue(token, issue.id);
@@ -508,7 +508,7 @@ export default function IssueEditor({ token, id, onClose, onUnauthorized, onDirt
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {issue.status === 'draft' && (
+          {canDeleteIssue(issue, new Date()) && (
             <button type="button" onClick={runDelete} disabled={working} className={barButton}>
               <Trash2 className="h-4 w-4" />
               Delete

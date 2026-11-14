@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { IssueRow } from '@/lib/newsletter/issue';
 
@@ -7,6 +7,7 @@ vi.mock('@/lib/newsletter-admin', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/newsletter-admin')>()),
   listIssues: vi.fn(),
   createIssue: vi.fn(),
+  deleteIssue: vi.fn(),
 }));
 
 import IssuesScreen from '@/components/admin/newsletter/IssuesScreen';
@@ -105,5 +106,75 @@ describe('IssuesScreen', () => {
     expect(rows[1]).toHaveTextContent('Scheduled · Tue 20 Oct');
     expect(screen.getByText('Skipped')).toBeInTheDocument();
     expect(screen.getByText('Missed')).toBeInTheDocument();
+  });
+
+  it('offers Delete for drafts and for skipped or missed issues whose send time has passed, and deletes after asking', async () => {
+    const row = (id: string, status: string, scheduled_for: string | null, subject: string) => ({
+      id,
+      subject,
+      issue_date: '2026-10-20',
+      status,
+      recipient_count: status === 'sent' ? 2 : null,
+      sent_at: status === 'sent' ? '2026-10-23T05:00:00.000Z' : null,
+      last_error: null,
+      updated_at: '2026-10-18T04:30:00.000Z',
+      kind: scheduled_for ? 'blog' : 'manual',
+      scheduled_for,
+      reason: null,
+    });
+    const past = '2020-01-07T04:30:00.000Z';
+    const ahead = '2099-01-06T04:30:00.000Z';
+    vi.mocked(api.listIssues).mockResolvedValue({
+      issues: [
+        row('d', 'draft', null, ''),
+        row('k', 'skipped', past, 'No newsletter on Tue 7 Jan'),
+        row('x', 'missed', past, 'Missed one'),
+        row('u', 'skipped', ahead, 'Skipped ahead'),
+        row('s', 'scheduled', ahead, 'Scheduled one'),
+        row('z', 'sent', null, 'test newsletter'),
+      ],
+      me: 'a@x',
+      from: 'Hope Trust <newsletter@hopetrustindia.com>',
+      subscribed: 648,
+    } as unknown as Awaited<ReturnType<typeof api.listIssues>>);
+    vi.mocked(api.deleteIssue).mockResolvedValue(undefined);
+    render(<IssuesScreen token="tkn" onUnauthorized={() => {}} onOpen={() => {}} />);
+    await screen.findByText('Scheduled one');
+
+    const deletes = screen.getAllByRole('button', { name: /^Delete / }).map((b) => b.getAttribute('aria-label'));
+    expect(deletes).toEqual(['Delete (no subject)', 'Delete No newsletter on Tue 7 Jan', 'Delete Missed one']);
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Delete No newsletter on Tue 7 Jan' }));
+    expect(api.deleteIssue).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete No newsletter on Tue 7 Jan' }));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(api.deleteIssue).toHaveBeenCalledWith('tkn', 'k');
+    await waitFor(() => expect(api.listIssues).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows why a delete was refused', async () => {
+    vi.mocked(api.listIssues).mockResolvedValue({
+      issues: [
+        {
+          id: 'd',
+          subject: 'Old idea',
+          issue_date: '2026-10-20',
+          status: 'draft',
+          recipient_count: null,
+          sent_at: null,
+          last_error: null,
+          updated_at: '2026-10-18T04:30:00.000Z',
+        },
+      ],
+      me: 'a@x',
+      from: 'x',
+      subscribed: 1,
+    } as unknown as Awaited<ReturnType<typeof api.listIssues>>);
+    vi.mocked(api.deleteIssue).mockRejectedValue(new Error('Only drafts can be deleted.'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<IssuesScreen token="tkn" onUnauthorized={() => {}} onOpen={() => {}} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Old idea' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only drafts can be deleted.');
   });
 });

@@ -66,8 +66,8 @@ export interface IssuesDb {
   create(fields: IssueDraft, actor: string): Promise<IssueRow>;
   /** Saves a draft's or scheduled issue's fields if unchanged since `ifUpdatedAt`; otherwise null. */
   saveDraft(id: string, fields: IssueSaveFields, actor: string, ifUpdatedAt: string): Promise<IssueRow | null>;
-  /** Deletes a draft; false when there is no draft with that id. */
-  deleteDraft(id: string): Promise<boolean>;
+  /** Deletes an issue if it still has `status` (canDeleteIssue decides which may go); false when it doesn't. */
+  deleteIssue(id: string, status: IssueStatus): Promise<boolean>;
   /** `from` → sending, with who started it and the issue number the email shows; null when it wasn't `from`. */
   lockForSend(id: string, actor: string, issueNumber: number, from: 'draft' | 'scheduled'): Promise<IssueRow | null>;
   /** sending or needs_check → sent. */
@@ -175,8 +175,8 @@ export function createIssuesDb(supabase: SupabaseClient): IssuesDb {
           .eq('updated_at', ifUpdatedAt),
       ),
 
-    async deleteDraft(id) {
-      const { data, error } = await table().delete().eq('id', id).eq('status', 'draft').select('id');
+    async deleteIssue(id, status) {
+      const { data, error } = await table().delete().eq('id', id).eq('status', status).select('id');
       check(error);
       return (data?.length ?? 0) > 0;
     },

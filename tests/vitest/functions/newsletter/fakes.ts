@@ -579,8 +579,8 @@ export function createMemoryIssues(now: () => Date) {
     async saveDraft(id, fields, actor, ifUpdatedAt) {
       return guarded(id, ['draft', 'scheduled'], { ...fields, updated_by: actor }, ifUpdatedAt);
     },
-    async deleteDraft(id) {
-      if (rows.get(id)?.status !== 'draft') return false;
+    async deleteIssue(id, status) {
+      if (rows.get(id)?.status !== status) return false;
       return rows.delete(id);
     },
     async lockForSend(id, actor, issueNumber, from) {
