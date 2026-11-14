@@ -2,13 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Bricolage_Grotesque } from 'next/font/google';
+import { bricolage as cardFont } from '@/lib/fonts';
 import type { Doctor } from '@/lib/doctors';
-
-const cardFont = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
 
 const CalendarIcon = () => (
   <svg

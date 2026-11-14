@@ -1,19 +1,9 @@
 import Header from '@/components/Header';
 import dynamic from 'next/dynamic';
-import { Bricolage_Grotesque } from 'next/font/google';
+import { bricolage } from '@/lib/fonts';
 import { DEFAULT_SHARE_IMAGE } from '@/lib/share-images';
 
 const Footer = dynamic(() => import('@/components/Footer'));
-
-const headingFont = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['600', '700'],
-});
-
-const bodyFont = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-});
 
 export const metadata = {
   title: 'Privacy Policy',
@@ -39,13 +29,13 @@ export default function PrivacyPolicyPage() {
       <main className="min-h-screen bg-[#F7F5EF]">
         <section className="mx-auto max-w-4xl px-4 sm:px-8 pb-20 pt-32 sm:pt-36">
           <h1
-            className={`${headingFont.className} text-3xl sm:text-4xl lg:text-5xl font-bold text-[#00373E] mb-12`}
+            className={`${bricolage.className} text-3xl sm:text-4xl lg:text-5xl font-bold text-[#00373E] mb-12`}
           >
             Privacy Policy
           </h1>
 
           <div className="space-y-10">
-            <div className={`${bodyFont.className} space-y-4 text-[#00373E]/80 text-base sm:text-lg`}>
+            <div className={`${bricolage.className} space-y-4 text-[#00373E]/80 text-base sm:text-lg`}>
               <p>
                 Welcome to the website of Hope Trust (Arel Hope Recovery Services LLP). If you continue to
                 browse and use this website, you are agreeing to comply with and be bound by the following
@@ -63,11 +53,11 @@ export default function PrivacyPolicyPage() {
 
             <div>
               <h2
-                className={`${headingFont.className} text-xl sm:text-2xl font-bold text-[#00373E] mb-4`}
+                className={`${bricolage.className} text-xl sm:text-2xl font-bold text-[#00373E] mb-4`}
               >
                 The use of this website is subject to the following terms of use:
               </h2>
-              <ul className={`${bodyFont.className} list-disc pl-6 space-y-3 text-[#00373E]/80 text-base sm:text-lg`}>
+              <ul className={`${bricolage.className} list-disc pl-6 space-y-3 text-[#00373E]/80 text-base sm:text-lg`}>
                 <li>
                   The content of the pages of this website is for your general information and use only. It is
                   subject to change without notice.
@@ -113,11 +103,11 @@ export default function PrivacyPolicyPage() {
 
             <div id="newsletter" className="scroll-mt-32">
               <h2
-                className={`${headingFont.className} text-xl sm:text-2xl font-bold text-[#00373E] mb-4`}
+                className={`${bricolage.className} text-xl sm:text-2xl font-bold text-[#00373E] mb-4`}
               >
                 Our newsletter
               </h2>
-              <div className={`${bodyFont.className} space-y-4 text-[#00373E]/80 text-base sm:text-lg`}>
+              <div className={`${bricolage.className} space-y-4 text-[#00373E]/80 text-base sm:text-lg`}>
                 <p>
                   If you sign up for the Hope Trust newsletter, we keep your name and email address and a record
                   of how you agreed: when you confirmed by clicking the link we emailed you, the page you signed

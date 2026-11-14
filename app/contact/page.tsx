@@ -3,7 +3,7 @@
 import React from 'react';
 import Header from '@/components/Header';
 import { motion } from 'motion/react';
-import { Bricolage_Grotesque } from 'next/font/google';
+import { bricolage } from '@/lib/fonts';
 import { MapPin, MessageSquare } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { siteConfig } from '@/lib/config';
@@ -13,11 +13,6 @@ import { z } from 'zod';
 
 const Footer = dynamic(() => import('@/components/Footer'));
 const ScrollingTextBanner = dynamic(() => import('@/components/ScrollingTextBanner'));
-
-const bricolage = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
 
 const CustomSubmitButton = ({ status, text }: { status: 'idle' | 'sending' | 'sent', text: string }) => {
   return (
