@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import WebVitals from '@/components/WebVitals';
 import LenisProvider from '@/components/LenisProvider';
 import { Toaster } from 'sonner';
@@ -11,8 +11,13 @@ import JsonLd from '@/components/JsonLd';
 import { getOrganizationSchema, getWebSiteSchema } from '@/lib/jsonld';
 import { siteConfig } from '@/lib/config';
 
-const inter = Inter({
-  subsets: ['latin'],
+// Self-hosted Inter (variable, latin). The previous next/font/google import
+// fetched the font from Google at build time, and that fetch broke the
+// Netlify build. A local file has no network dependency, so builds are stable.
+const inter = localFont({
+  src: '../public/inter-latin-wght-normal.woff2',
+  weight: '100 900',
+  style: 'normal',
   display: 'swap',
   preload: true,
   fallback: ['system-ui', 'arial'],
@@ -68,19 +73,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="smooth-scroll" data-scroll-behavior="smooth" style={{ position: 'relative' }}>
-      <head>
-        <link rel="dns-prefetch" href="//fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-      </head>
+      {/* The fonts.googleapis.com / fonts.gstatic.com preconnect links were
+          removed: next/font self-hosts fonts, so the browser never contacts
+          Google for them. */}
       <body className={`${inter.className} antialiased`}>
         <JsonLd data={getOrganizationSchema()} />
         <JsonLd data={getWebSiteSchema()} />
